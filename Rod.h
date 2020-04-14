@@ -40,138 +40,8 @@ namespace Rod
 	};
 
 
-	template<int dim>
-	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
-							const bool &apply_dirichlet_bc, double &current_load_increment,
-							const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
-	{
-		/* inputs:
-		 * dof_handler_ref,
-		 * fe
-		 * apply_dirichlet_bc
-		 * constraints
-		 * current_load_increment
-		 */
-
-		// Symmetry constraints:
-		// Update and apply new constraints
-		//		on x0_plane for symmetry (displacement_in_x = 0)
-		//		on y0_plane for symmetry (displacement_in_y = 0)
-		//		on z0_plane for symmetry (displacement_in_z = 0)
-
-		parameterCollection parameters_internal ( Vec_boundary_id_collection );
-
-		const FEValuesExtractors::Vector displacement(0);
-		const FEValuesExtractors::Scalar x_displacement(0);
-		const FEValuesExtractors::Scalar y_displacement(1);
-
-		// on X0 plane
-		const int boundary_id_X0 = parameters_internal.boundary_id_minus_X;
-
-		if (apply_dirichlet_bc == true )
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														boundary_id_X0,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-		}
-		else	// in the exact same manner
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														boundary_id_X0,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-		}
-
-		// on Y0 edge
-		const int boundary_id_Y0 = parameters_internal.boundary_id_minus_Y;
-
-		if (apply_dirichlet_bc == true )
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														boundary_id_Y0,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-		}
-		else	// in the exact same manner
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														boundary_id_Y0,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-		}
-
-		// on Z0 plane
-		if ( dim==3 )
-		{
-			const FEValuesExtractors::Scalar z_displacement(2);
-			const int boundary_id_Z0 = parameters_internal.boundary_id_minus_Z;
-
-			if (apply_dirichlet_bc == true )
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															boundary_id_Z0,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
-			else	// in the exact same manner
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															boundary_id_Z0,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
-		}
-
-		if ( parameter.driver == 2/*Dirichlet*/ ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
-		{
-			const int boundary_id_top = parameters_internal.boundary_id_plus_Y;
-
-			// on top edge
-			if (apply_dirichlet_bc == true )
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															boundary_id_top,
-															ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
-															constraints,
-															fe.component_mask(y_displacement)
-														);
-			}
-			else
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															boundary_id_top,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(y_displacement)
-														);
-			}
-		}
-	}
-
-
 	/*
-	 * Shift a layer of vertices of the triangulation at the coord position initial_pos to the position new_pos.
+	 * Shift a layer of vertices of the triangulation at the coord position \a initial_pos to the position \a new_pos
 	 * @param direction Gives the shift direction 0(x), 1(y), 2(z)
 	 */
 	template <int dim>
@@ -200,16 +70,28 @@ namespace Rod
 
 	double get_current_notch_radius( double &y_coord, const double &half_notch_length, const double &radius, const double &notch_radius, const double &R  )
 	{
-		if ( true /*radial notch*/ )
+		// Here you can choose between a radial notch (smooth dent) and a sharp triangular notch (viewed in the cross section)
+		const bool radial_notch = true;
+
+		if ( radial_notch )
 			return R + notch_radius - std::sqrt( R*R - y_coord*y_coord );
-		else if ( false /*linear notch*/)
+		else  /*linear notch*/
 			return y_coord/half_notch_length * (radius-notch_radius) + notch_radius;
 	}
 
 
+
+	/*
+	 * @param triangulation
+	 * @param half_notch_length Half the length of the notch in y-direction. We only model 1/8 of the entire bar, hence only 1/2 of the notch length
+	 * @param notch_radius The radius of the rod that is left at y=0 in the notch
+	 * @param R The radius of the notch corresponds to the tool radius that could be used on a lathe to create the notch.
+	 */
 	template <int dim>
 	void notch_body( Triangulation<dim> &triangulation, const double &half_notch_length, const double &radius, const double &notch_radius, const double &R  )
 	{
+		Assert(dim==3, ExcMessage("notch_body<< not yet implemented for dim=2."));
+
 		enum enum_coord_directions
 		{
 			x = 0, y = 1, z = 2
@@ -218,10 +100,7 @@ namespace Rod
 
 		if ( /*Deep notch: also adapt inner nodes in the notched area*/true )
 		{
-			/*
-			 * Input arguments:
-			 * * triangulation, half_notch_length, R, notch_radius
-			 */
+			// ToDo-optimize: Do we need the \a index_list anymore? (compare shallow notch below)
 			std::vector<unsigned int> index_list;
 
 			// Generate the notch
@@ -248,7 +127,7 @@ namespace Rod
 						  // The radius of the leftover notched material describes an arc along the y-coord.
 						  // Hence, the radius of the notch changes with the y-coord
 						   double current_notch_radius = get_current_notch_radius(y_coord, half_notch_length, radius, notch_radius, R );
-						  // Set the shift vector that moves the vertex inwards
+						  // Set the shift vector that moves the vertex inwards (along its radius)
 						   Point<dim> shift_vector;
 						   shift_vector[x] = (current_notch_radius - radius) * std::sqrt(vertex_radius/radius) * x_coord/radius;
 						   if ( dim==3 )
@@ -261,9 +140,8 @@ namespace Rod
 				  }
 			 }
 		}
-		else /*only move the outer nodes of the notch inwards, this is limited to shallow notches*/
+		else /*only move the outer nodes of the notch inwards, this is limited to shallow notches and does not distort the inner cells*/
 		{
-			Assert(dim==3, ExcMessage("notch_body<< not yet implemented for dim=2."));
 			Assert( (radius - notch_radius) < radius/6.,
 					ExcMessage("Rod<< You choose the shallow notching, but your notch seems to be very deep. Consider using the deep notch option above."));
 			 for (typename Triangulation<dim>::active_cell_iterator
@@ -301,17 +179,21 @@ namespace Rod
 
 
 // 3d grid
+	/*
+	 * @param triangulation
+	 * @param parameter For simplicity the entire parameter file is input. Actually only the following parameters are needed:
+	 * @param half_length Half the length of the entire rod
+	 * @param radius The outer radius of the rod
+	 * @param half_notch_length Half the length of the notch in y-direction. We only model 1/8 of the entire bar, hence only 1/2 of the notch length
+	 * @param notch_radius The radius of the rod that is left at y=0 in the notch
+	 *
+	 * * parameter.width,holeRadius,notchWidth,ratio_x,nbr_holeEdge_refinements,nbr_global_refinements
+	 */
 	template <int dim>
 	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
 	{
-		/*
-		 * Input arguments:
-		 * * boundary ids and manifold id
-		 * * search tolerance
-		 * * parameter.width,holeRadius,notchWidth,ratio_x,nbr_holeEdge_refinements,nbr_global_refinements
-		 */
-
-		parameterCollection parameters_internal ( Vec_boundary_id_collection );
+		// parameterCollection that contains the boundary ids
+		 parameterCollection parameters_internal ( Vec_boundary_id_collection );
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
@@ -320,6 +202,8 @@ namespace Rod
 		const double half_notch_length = parameter.notchWidth/2.;//8.98/2.;
 		const double notch_radius = parameter.ratio_x * radius; // 0.982
 
+		const unsigned int n_additional_refinements = parameter.nbr_holeEdge_refinements;
+		const unsigned int n_global_refinements = parameter.nbr_global_refinements;
 		const int n_max_of_elements_in_the_coarse_area = 6;
 
 		// The radius of the notch, e.g. the tool radius that was used to create the notch from the outside
@@ -331,7 +215,7 @@ namespace Rod
 			x = 0, y = 1, z = 2
 		};
 
-		Assert(parameter.nbr_holeEdge_refinements>0, ExcMessage("Rod<< Mesh not implemented for only 4 elements in total. Please increase the nbr_holeEdge_refinements to at least 1."));
+		Assert(n_additional_refinements>0, ExcMessage("Rod<< Mesh not implemented for only 4 elements in total. Please increase the nbr_holeEdge_refinements to at least 1."));
 
 		// Create in a first step the triangulation representing 1/8 of a cylinder
 		 {
@@ -428,7 +312,7 @@ namespace Rod
 		// Add some local refinements:
 		// Cells are cut in y-direction, so we simple get some more cells that will be rearranged subsequently
 		// @note For some reason I cannot cut_y two cells that lie next to each other. Hence, I only refine the cell at the y0-plane
-		 for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
+		 for (unsigned int refine_counter=0; refine_counter < n_additional_refinements; refine_counter++)
 		 {
 			for (typename Triangulation<dim>::active_cell_iterator
 			   cell = triangulation.begin_active();
@@ -449,7 +333,7 @@ namespace Rod
 	  // This is a bit tricky and can best be comprehended on paper for specific example values.
 		double initial_pos, new_pos;
 
-		const unsigned int nbr_of_y_cells = 4 + parameter.nbr_holeEdge_refinements;
+		const unsigned int nbr_of_y_cells = 4 + n_additional_refinements;
 		unsigned int nbr_of_coarse_y_cells = std::min(int(std::ceil(nbr_of_y_cells/2.)),n_max_of_elements_in_the_coarse_area);
 		const unsigned int nbr_of_fine_y_cells = nbr_of_y_cells - nbr_of_coarse_y_cells;
 
@@ -471,11 +355,11 @@ namespace Rod
 			}
 
 		// A small trick to get this general framework to operate even for the two lowest refinements 1 and 2
-		 if ( parameter.nbr_holeEdge_refinements<=2 )
+		 if ( n_additional_refinements <= 2 )
 			 nbr_of_coarse_y_cells = 4;
 
 		// Now we are down to the notch length
-		 for ( unsigned int i=(nbr_of_coarse_y_cells-1); i<=(parameter.nbr_holeEdge_refinements+2); i++ )
+		 for ( unsigned int i=(nbr_of_coarse_y_cells-1); i<=(n_additional_refinements+2); i++ )
 		 {
 			initial_pos = half_length * 1./(std::pow(2,i));
 			new_pos = (nbr_of_y_cells-1 - i)/double(nbr_of_fine_y_cells)  * half_notch_length;
@@ -486,7 +370,7 @@ namespace Rod
 		 notch_body( triangulation, half_notch_length, radius, notch_radius, R );
 
 		// Possibly some additional global isotropic refinements
-		 triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
+		 triangulation.refine_global(n_global_refinements);	// ... Parameter.prm file
 
 //		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 //		{
@@ -659,4 +543,134 @@ namespace Rod
 //			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
 //		}
 	}
+
+
+	template<int dim>
+		void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
+								const bool &apply_dirichlet_bc, double &current_load_increment,
+								const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+		{
+			/* inputs:
+			 * dof_handler_ref,
+			 * fe
+			 * apply_dirichlet_bc
+			 * constraints
+			 * current_load_increment
+			 */
+
+			// Symmetry constraints:
+			// Update and apply new constraints
+			//		on x0_plane for symmetry (displacement_in_x = 0)
+			//		on y0_plane for symmetry (displacement_in_y = 0)
+			//		on z0_plane for symmetry (displacement_in_z = 0)
+
+			parameterCollection parameters_internal ( Vec_boundary_id_collection );
+
+			const FEValuesExtractors::Vector displacement(0);
+			const FEValuesExtractors::Scalar x_displacement(0);
+			const FEValuesExtractors::Scalar y_displacement(1);
+
+			// on X0 plane
+			const int boundary_id_X0 = parameters_internal.boundary_id_minus_X;
+
+			if (apply_dirichlet_bc == true )
+			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															boundary_id_X0,
+															ZeroFunction<dim> (n_components),
+															constraints,
+															fe.component_mask(x_displacement)
+														);
+			}
+			else	// in the exact same manner
+			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															boundary_id_X0,
+															ZeroFunction<dim> (n_components),
+															constraints,
+															fe.component_mask(x_displacement)
+														);
+			}
+
+			// on Y0 edge
+			const int boundary_id_Y0 = parameters_internal.boundary_id_minus_Y;
+
+			if (apply_dirichlet_bc == true )
+			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															boundary_id_Y0,
+															ZeroFunction<dim> (n_components),
+															constraints,
+															fe.component_mask(y_displacement)
+														);
+			}
+			else	// in the exact same manner
+			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															boundary_id_Y0,
+															ZeroFunction<dim> (n_components),
+															constraints,
+															fe.component_mask(y_displacement)
+														);
+			}
+
+			// on Z0 plane
+			if ( dim==3 )
+			{
+				const FEValuesExtractors::Scalar z_displacement(2);
+				const int boundary_id_Z0 = parameters_internal.boundary_id_minus_Z;
+
+				if (apply_dirichlet_bc == true )
+				{
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																boundary_id_Z0,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(z_displacement)
+															);
+				}
+				else	// in the exact same manner
+				{
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																boundary_id_Z0,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(z_displacement)
+															);
+				}
+			}
+
+			if ( parameter.driver == 2/*Dirichlet*/ ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
+			{
+				const int boundary_id_top = parameters_internal.boundary_id_plus_Y;
+
+				// on top edge
+				if (apply_dirichlet_bc == true )
+				{
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																boundary_id_top,
+																ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
+																constraints,
+																fe.component_mask(y_displacement)
+															);
+				}
+				else
+				{
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																boundary_id_top,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(y_displacement)
+															);
+				}
+			}
+		}
 }
