@@ -11,7 +11,7 @@
 
 using namespace dealii;
 
-namespace OneElement
+namespace Rod
 {
 	class parameterCollection
 	{
@@ -26,8 +26,6 @@ namespace OneElement
 		{
 		}
 
-		const double hole_diameter = 2; // so the hole_radius (a) = 1
-
 		const types::boundary_id boundary_id_minus_X;// = 5;
 		const types::boundary_id boundary_id_minus_Y;// = 3;
 		const types::boundary_id boundary_id_plus_X; // = 6;
@@ -37,43 +35,7 @@ namespace OneElement
 		const types::boundary_id boundary_id_plus_Z =  2;
 
 		const double search_tolerance = 1e-12;
-
-		// only relevant for 3d grid:
-		  const unsigned int n_repetitions_z = 2;			// nbr of Unterteilungen in z-direction for 3d meshing
 	};
-
-
-// 2D grid
-	template <int dim>
-	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
-	{
-		AssertThrow( false, ExcMessage("The One Element mesh has not yet been implemented for 2D. Use either 3D or simply implement it yourself."));
-
-		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-		/*
-		{
-			std::ofstream out ("grid-2d_quarter_plate_merged.eps");
-			GridOut grid_out;
-			GridOutFlags::Eps<2> eps_flags;
-			eps_flags.line_width = 0.1;
-			grid_out.set_flags (eps_flags);
-			grid_out.write_eps (triangulation, out);
-			std::cout << "Grid written to grid-2d_quarter_plate_merged.eps" << std::endl;
-			std::cout << "nElem: " << triangulation.n_active_cells() << std::endl;
-			AssertThrow(false,ExcMessage("ddd"));
-		}
-
-		{
-			std::ofstream out_ucd("Grid-2d_quarter_plate_merged.inp");
-			GridOut grid_out;
-			GridOutFlags::Ucd ucd_flags(true,true,true);
-			grid_out.set_flags(ucd_flags);
-			grid_out.write_ucd(triangulation, out_ucd);
-			std::cout<<"Mesh written to Grid-2d_quarter_plate_merged.inp "<<std::endl;
-		}
-		*/
-	}
-
 
 
 	template<int dim>
@@ -216,11 +178,36 @@ namespace OneElement
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
-		const double width = 1; // unit cube
+		const double half_length = 53.34/2.;
+		const double radius = 6.4135;
 
-		GridGenerator::hyper_cube(triangulation);
+		{
+			Triangulation<dim> tria_full_cylinder;
+			GridGenerator::cylinder(tria_full_cylinder, radius, half_length);
 
-		//Clear boundary ID's
+			// Let's first refine the "cylinder" ones, because the initial mesh is a brick
+			tria_full_cylinder.refine_global( 1 );
+
+			GridTools::rotate( std::atan(1)*2, 2, tria_full_cylinder);
+
+			std::set<typename Triangulation<dim>::active_cell_iterator > cells_to_remove;
+			for (typename Triangulation<dim>::active_cell_iterator
+				 cell = tria_full_cylinder.begin_active();
+				 cell != tria_full_cylinder.end(); ++cell)
+			{
+				// Remove all cells that are not in the first quadrant.
+				// The 1/8 shall reside in the positive x,y,z quadrant
+				if (cell->center()[0] < 0.0 || cell->center()[1] < 0.0 || cell->center()[2] < 0.0 )
+					cells_to_remove.insert(cell);
+			}
+
+			Assert(cells_to_remove.size() > 0, ExcInternalError());
+			Assert(cells_to_remove.size() != tria_full_cylinder.n_active_cells(), ExcInternalError());
+			GridGenerator::create_triangulation_with_removed_cells(tria_full_cylinder,cells_to_remove,triangulation);
+		}
+
+
+		// Clear boundary ID's
 		for (typename Triangulation<dim>::active_cell_iterator
 			 cell = triangulation.begin_active();
 			 cell != triangulation.end(); ++cell)
@@ -247,15 +234,11 @@ namespace OneElement
 				{
 					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);
 				}
-				else if (std::abs(cell->face(face)->center()[0] - width) < search_tolerance)
-				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_X);
-				}
 				else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
 				{
 					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
 				}
-				else if (std::abs(cell->face(face)->center()[1] - width) < search_tolerance)
+				else if (std::abs(cell->face(face)->center()[1] - half_length) < search_tolerance)
 				{
 					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Y);
 				}
@@ -263,19 +246,34 @@ namespace OneElement
 				{
 					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Z);
 				}
-				else if (std::abs(cell->face(face)->center()[2] - width) < search_tolerance)
-				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Z);
-				}
-				else
-				{
-					AssertThrow(false, ExcMessage("OneElement - make_grid 3D: Found an unidentified face at the boundary. Maybe it slipt through the assignment or that face is simply not needed. So either check the implementation or comment this line in the code"));
-				}
 			  }
 		}
 
+		// Attach a manifold to the curved boundary and refine
+		// @note We can only guarantee that the vertices sit on the curve, so we must test with their position instead of the cell centre.
+		for (typename Triangulation<dim>::active_cell_iterator
+		   cell = triangulation.begin_active();
+		   cell != triangulation.end(); ++cell)
+		{
+		  for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+			if (cell->face(face)->at_boundary())
+			  for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
+			  {
+				 double distance_2d_xz = std::sqrt( cell->vertex(vertex)[0]*cell->vertex(vertex)[0] + cell->vertex(vertex)[2]*cell->vertex(vertex)[2] );
+				 if (std::abs(distance_2d_xz - radius) < 1e-12)
+				 {
+					cell->face(face)->set_all_manifold_ids(10);
+					break;
+				 }
+			  }
+		}
+
+		CylindricalManifold<dim> cylindrical_manifold_3d (1); // y-axis
+		triangulation.set_manifold(10,cylindrical_manifold_3d);
+
 		triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
+		// Mark the cells at the center for softening (similar to reduction in cross sectional area
 		if ( triangulation.n_active_cells()>1)
 		{
 			bool found_cell=false;
@@ -290,14 +288,32 @@ namespace OneElement
 					  found_cell = true;
 					  break;
 				  }
-
-				if ( found_cell )
-					break;
 			}
 
-			AssertThrow(found_cell, ExcMessage("OneElement: Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
+			AssertThrow(found_cell, ExcMessage("Rod: Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
 		}
 
+		// add some local refinements
+		for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
+		{
+			//  You probably cannot use this local refinements because the new nodes on the boundary are not compatible to the old ones. Maybe you have to deactivate the cylindrical manifold.
+//			if ( parameter.nbr_holeEdge_refinements>0 )
+//				triangulation.reset_manifold(10); // Clear manifold
+
+			for (typename Triangulation<dim>::active_cell_iterator
+			   cell = triangulation.begin_active();
+			   cell != triangulation.end(); ++cell)
+			{
+				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+					if (cell->face(face)->at_boundary())
+						if ( cell->face(face)->center()[1] <= half_length/(5.*(refine_counter+1)) )
+						{
+							cell->set_refine_flag();
+							break;
+						}
+			}
+			triangulation.execute_coarsening_and_refinement();
+		}
 
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 		/*
@@ -307,6 +323,8 @@ namespace OneElement
 			grid_out.write_eps (triangulation, out);
 			std::cout << "Grid written to grid-3d_quarter_plate_merged.eps" << std::endl;
 		}
+		*/
+		/*
 		{
 			std::ofstream out_ucd("Grid-3d_quarter_plate_merged.inp");
 			GridOut grid_out;
