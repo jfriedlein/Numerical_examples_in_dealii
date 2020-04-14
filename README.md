@@ -5,4 +5,5 @@ A collection of different numerical examples implemented in deal.ii
 - add a few pictures of the meshes here
 - add a documentation (input arguments, interface)
 
-![Alt text](images/Rod - geometry notch60.pngraw=true "Title")
+### Rod
+<img src="/images/Rod%20-%20geometry%20notch60.png" width="400">
