@@ -291,7 +291,7 @@ namespace OneElement
 					  break;
 				  }
 
-				if ( found_cell )	// ToDo: check: does a break leave only the inner for-loop?
+				if ( found_cell )
 					break;
 			}
 
