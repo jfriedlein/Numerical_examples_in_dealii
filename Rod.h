@@ -59,7 +59,7 @@ namespace Rod
 				  Point<dim> shift_vector;
 				  shift_vector[direction] = (new_pos-initial_pos);
 				  cell->vertex(vertex) += shift_vector;
-				  shifted_node = true; // We have shifted at least a single node
+				  shifted_node = true; // -> We have shifted at least a single node
 			  }
 		  }
 		}
