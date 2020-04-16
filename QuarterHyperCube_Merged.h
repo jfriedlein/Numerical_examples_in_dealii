@@ -316,7 +316,7 @@ namespace QuarterHyperCube_Merged
 						subdivision_width.push_back(width_remaining/n_subs);
 					step_sizes.push_back(subdivision_width);
 					const double sum_half_width = std::accumulate(subdivision_width.begin(), subdivision_width.end(), 0.0);
-					Assert(std::abs(sum_half_width-width/2.0) < 1e-12, ExcInternalError());
+					AssertThrow(std::abs(sum_half_width-width/2.0) < 1e-12, ExcInternalError());
 				}
 				// for length
 				{
@@ -330,7 +330,7 @@ namespace QuarterHyperCube_Merged
 					subdivision_length.push_back(length_remaining/n_subs);
 					step_sizes.push_back(subdivision_length);
 					const double sum_half_length = std::accumulate(subdivision_length.begin(), subdivision_length.end(), 0.0);
-					Assert(std::abs(sum_half_length-length/2.0) < 1e-12, ExcInternalError());
+					AssertThrow(std::abs(sum_half_length-length/2.0) < 1e-12, ExcInternalError());
 				}
 
 				GridGenerator::subdivided_hyper_rectangle( tria_plate,

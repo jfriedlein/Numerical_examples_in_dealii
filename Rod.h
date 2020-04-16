@@ -64,7 +64,7 @@ namespace Rod
 		  }
 		}
 		// Ensure that we shifted at least a single node
-		 Assert( shifted_node==true, ExcMessage("shift_vertex_layer<< You haven't moved a single node. Please check the selection criterion initial_pos."));
+		 AssertThrow( shifted_node==true, ExcMessage("shift_vertex_layer<< You haven't moved a single node. Please check the selection criterion initial_pos."));
 	}
 
 
