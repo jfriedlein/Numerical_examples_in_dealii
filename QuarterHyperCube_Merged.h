@@ -45,7 +45,7 @@ namespace QuarterHyperCube_Merged
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double>  &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
-							const bool &apply_dirichlet_bc, double &current_load_increment,
+							const bool &apply_dirichlet_bc, const double &current_load_increment,
 							const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
 	{
 		/* inputs:
@@ -146,6 +146,7 @@ namespace QuarterHyperCube_Merged
 		if ( parameter.driver == 2/*Dirichlet*/ )
 		{
 			const int boundary_id_top = parameters_internal.boundary_id_plus_Y;
+
 
 			// on top edge
 			if (apply_dirichlet_bc == true )

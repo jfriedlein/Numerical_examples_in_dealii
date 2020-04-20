@@ -9,6 +9,9 @@
 #include <fstream>
 #include <cmath>
 
+#include "../MA-Code/enumerator_list.h"
+
+
 using namespace dealii;
 
 namespace Rod
@@ -90,8 +93,6 @@ namespace Rod
 	template <int dim>
 	void notch_body( Triangulation<dim> &triangulation, const double &half_notch_length, const double &radius, const double &notch_radius, const double &R  )
 	{
-		Assert(dim==3, ExcMessage("notch_body<< not yet implemented for dim=2."));
-
 		enum enum_coord_directions
 		{
 			x = 0, y = 1, z = 2
@@ -394,7 +395,6 @@ namespace Rod
 	template <int dim>
 	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
 	{
-		Assert(false, ExcMessage("Rod<< This function was never tested for 2D grids. Please be careful."));
 		/*
 		 * Input arguments:
 		 * * boundary ids and manifold id
@@ -646,7 +646,7 @@ namespace Rod
 				}
 			}
 
-			if ( parameter.driver == 2/*Dirichlet*/ ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
+			if ( parameter.driver == enums::Dirichlet )
 			{
 				const int boundary_id_top = parameters_internal.boundary_id_plus_Y;
 
