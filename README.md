@@ -2,8 +2,10 @@
 A collection of different numerical examples implemented in deal.ii
 
 ## ToDo
-- add a few pictures of the meshes here
-- add a documentation (input arguments, interface)
+* add a few pictures of the meshes here
+* add a documentation (input arguments, interface)
+* update the QPlate grid with the new deal.ii function plate_with_a_hole
+* add optional parameters/switches (e.g. apply z-sym on pos z-face) as global variables into a standardised framework
 
 ## Interface
 make_grid(*):

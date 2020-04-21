@@ -141,6 +141,32 @@ namespace QuarterHyperCube_Merged
 															fe.component_mask(z_displacement)
 														);
 			}
+
+			if ( false/*apply sym BC on positive z-face also*/ )
+			{
+				const int boundary_id_Zplus = parameters_internal.boundary_id_plus_Z;
+
+				if (apply_dirichlet_bc == true )
+				{
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																boundary_id_Zplus,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(z_displacement)
+															);
+				}
+				else	// in the exact same manner
+				{
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																boundary_id_Zplus,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(z_displacement)
+															);
+				}
+			}
 		}
 
 		if ( parameter.driver == 2/*Dirichlet*/ )
