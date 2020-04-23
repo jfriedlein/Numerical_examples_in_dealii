@@ -83,7 +83,6 @@ namespace Rod
 	}
 
 
-
 	/*
 	 * @param triangulation
 	 * @param half_notch_length Half the length of the notch in y-direction. We only model 1/8 of the entire bar, hence only 1/2 of the notch length
@@ -486,7 +485,7 @@ namespace Rod
 			triangulation.execute_coarsening_and_refinement();
 		 }
 
-		 // ToDo-optimize: Isn't this very similar to the 3D case? Maybe merge 2D and 3D
+	  // ToDo-optimize: Isn't this very similar to the 3D case? Maybe merge 2D and 3D
 	  // Shift the refinement layers in y-direction:
 	  // This is a bit tricky and can best be comprehended on paper for specific example values.
 		double initial_pos, new_pos;
