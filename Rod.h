@@ -411,6 +411,8 @@ namespace Rod
 		const double half_notch_length = parameter.notchWidth/2.;//8.98/2.;
 		const double notch_radius = parameter.ratio_x * radius; // 0.982
 
+		const int n_max_of_elements_in_the_coarse_area = 6;
+
 		// The radius of the notch, e.g. the tool radius that was used to create the notch from the outside
 		 const double R = ( half_notch_length*half_notch_length + (radius - notch_radius)*(radius - notch_radius) )
 						  / ( 2.*(radius - notch_radius) );
@@ -484,12 +486,13 @@ namespace Rod
 			triangulation.execute_coarsening_and_refinement();
 		 }
 
+		 // ToDo-optimize: Isn't this very similar to the 3D case? Maybe merge 2D and 3D
 	  // Shift the refinement layers in y-direction:
 	  // This is a bit tricky and can best be comprehended on paper for specific example values.
 		double initial_pos, new_pos;
 
 		const unsigned int nbr_of_y_cells = 4 + parameter.nbr_holeEdge_refinements;
-		unsigned int nbr_of_coarse_y_cells = std::ceil(nbr_of_y_cells/2.);
+		unsigned int nbr_of_coarse_y_cells = std::min(int(std::ceil(nbr_of_y_cells/2.)),n_max_of_elements_in_the_coarse_area);
 		const unsigned int nbr_of_fine_y_cells = nbr_of_y_cells - nbr_of_coarse_y_cells;
 
 		// Shift the coarsest cells such that the coarser outer area is uniformly discretised
