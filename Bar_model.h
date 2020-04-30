@@ -43,39 +43,6 @@ namespace BarModel
 	};
 
 
-// 2D grid
-	template <int dim>
-	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
-	{
-		AssertThrow( false, ExcMessage("The One Element mesh has not yet been implemented for 2D. Use either 3D or simply implement it yourself."));
-
-		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-		/*
-		{
-			std::ofstream out ("grid-2d_quarter_plate_merged.eps");
-			GridOut grid_out;
-			GridOutFlags::Eps<2> eps_flags;
-			eps_flags.line_width = 0.1;
-			grid_out.set_flags (eps_flags);
-			grid_out.write_eps (triangulation, out);
-			std::cout << "Grid written to grid-2d_quarter_plate_merged.eps" << std::endl;
-			std::cout << "nElem: " << triangulation.n_active_cells() << std::endl;
-			AssertThrow(false,ExcMessage("ddd"));
-		}
-
-		{
-			std::ofstream out_ucd("Grid-2d_quarter_plate_merged.inp");
-			GridOut grid_out;
-			GridOutFlags::Ucd ucd_flags(true,true,true);
-			grid_out.set_flags(ucd_flags);
-			grid_out.write_ucd(triangulation, out_ucd);
-			std::cout<<"Mesh written to Grid-2d_quarter_plate_merged.inp "<<std::endl;
-		}
-		*/
-	}
-
-
-
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
 							const bool &apply_dirichlet_bc, double &current_load_increment,
@@ -175,6 +142,30 @@ namespace BarModel
 															fe.component_mask(z_displacement)
 														);
 			}
+
+			if ( false/*apply sym BC on positive z-face also*/ )
+			{
+				if (apply_dirichlet_bc == true )
+				{
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																parameters_internal.boundary_id_plus_Z,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(z_displacement)
+															);
+				}
+				else	// in the exact same manner
+				{
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																parameters_internal.boundary_id_plus_Z,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(z_displacement)
+															);
+				}
+			}
 		}
 
 		if ( parameter.driver == 2/*Dirichlet*/ ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
@@ -205,6 +196,157 @@ namespace BarModel
 		}
 	}
 
+
+
+	// 2D grid
+		template <int dim>
+		void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+		{
+			parameterCollection parameters_internal ( Vec_boundary_id_collection );
+
+			const double search_tolerance = parameters_internal.search_tolerance;
+
+			// ToDo: use the values from the parameter file
+			const double width = 1; // equals depth, square bottom area
+			const double height = 8;
+
+			// The points that span the brick
+			 Point<dim> p1 (0,0);
+			 Point<dim> p2 (width, height); // extends in y-direction its height (loaded in y-direction as the othe models)
+
+			// vector containing the number of elements in each dimension
+			 std::vector<unsigned int> repetitions (3);
+			 repetitions[0]=1; // x
+			 repetitions[1]=parameter.grid_y_repetitions; // y
+
+			GridGenerator::subdivided_hyper_rectangle 	( 	triangulation,
+															repetitions,
+															p1,
+															p2
+														);
+
+			// ToDo-optimize: The following is similar for 2D and 3D, maybe merge it
+			//Clear boundary ID's
+			for (typename Triangulation<dim>::active_cell_iterator
+				 cell = triangulation.begin_active();
+				 cell != triangulation.end(); ++cell)
+			{
+				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+				  if (cell->face(face)->at_boundary())
+				  {
+					  cell->face(face)->set_all_boundary_ids(0);
+				  }
+			}
+
+			//Set boundary IDs and and manifolds
+			for (typename Triangulation<dim>::active_cell_iterator
+				 cell = triangulation.begin_active();
+				 cell != triangulation.end(); ++cell)
+			{
+				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+				  if (cell->face(face)->at_boundary())
+				  {
+					//Set boundary IDs
+					if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
+					{
+						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);
+					}
+					else if (std::abs(cell->face(face)->center()[0] - width) < search_tolerance)
+					{
+						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_X);
+					}
+					else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
+					{
+						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+					}
+					else if (std::abs(cell->face(face)->center()[1] - height) < search_tolerance)
+					{
+						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Y);
+					}
+					else
+					{
+						// There are just eight faces, so if we missed one, something went clearly terribly wrong
+						 AssertThrow(false, ExcMessage("BarModel - make_grid 2D: Found an unidentified face at the boundary. Maybe it slipt through the assignment or that face is simply not needed. So either check the implementation or comment this line in the code"));
+					}
+				  }
+			}
+
+			if ( true/*only refine globally*/ )
+				triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
+			else // refine in a special manner only cells around the origin
+			{
+				for ( unsigned int nbr_local_ref=0; nbr_local_ref<parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
+				{
+					for (typename Triangulation<dim>::active_cell_iterator
+								 cell = triangulation.begin_active();
+								 cell != triangulation.end(); ++cell)
+					{
+						for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+						  if (cell->face(face)->at_boundary())
+						  {
+							// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
+							if (std::abs(cell->face(face)->center()[1] ) < 1./(nbr_local_ref+1.))
+							{
+								cell->set_refine_flag();
+								break;
+							}
+						  }
+					}
+					triangulation.execute_coarsening_and_refinement();
+				}
+			}
+
+			// Mark the innermost cell(s) for softening to trigger the damage development
+			if ( triangulation.n_active_cells()>1)
+			{
+				bool found_cell=false;
+				for (typename Triangulation<dim>::active_cell_iterator
+							 cell = triangulation.begin_active();
+							 cell != triangulation.end(); ++cell)
+				{
+					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+					 // Find the cell that has one vertex at the origin
+	//				  if ( (cell->vertex(vertex)).distance(centre)<1e-12 )
+					 // Find cells that lay on the xz-plane (y=0)
+					  if ( std::abs(cell->vertex(vertex)[1]) < 1 ) // vs 1e-12 used previously
+					  {
+						  cell->set_material_id(1);
+						  found_cell = true;
+						  break;
+					  }
+
+					if ( /*only weaken one cell:*/ false  && found_cell )	// ToDo: check: does a break leave only the inner for-loop?
+						break;
+				}
+
+				AssertThrow(found_cell, ExcMessage("BarModel: Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
+			}
+
+
+			// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
+			/*
+			{
+				std::ofstream out ("grid-2d_quarter_plate_merged.eps");
+				GridOut grid_out;
+				GridOutFlags::Eps<2> eps_flags;
+				eps_flags.line_width = 0.1;
+				grid_out.set_flags (eps_flags);
+				grid_out.write_eps (triangulation, out);
+				std::cout << "Grid written to grid-2d_quarter_plate_merged.eps" << std::endl;
+				std::cout << "nElem: " << triangulation.n_active_cells() << std::endl;
+				AssertThrow(false,ExcMessage("ddd"));
+			}
+
+			{
+				std::ofstream out_ucd("Grid-2d_quarter_plate_merged.inp");
+				GridOut grid_out;
+				GridOutFlags::Ucd ucd_flags(true,true,true);
+				grid_out.set_flags(ucd_flags);
+				grid_out.write_ucd(triangulation, out_ucd);
+				std::cout<<"Mesh written to Grid-2d_quarter_plate_merged.inp "<<std::endl;
+			}
+			*/
+		}
 
 
 
