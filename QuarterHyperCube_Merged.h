@@ -5,6 +5,8 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/manifold_lib.h>
 
+#include "../MA-Code/enumerator_list.h"
+
 #include <iostream>
 #include <fstream>
 #include <cmath>
@@ -25,8 +27,6 @@ namespace QuarterHyperCube_Merged
 			boundary_id_minus_Z(Vec_boundary_id_collection[4])
 		{
 		}
-
-		const double hole_diameter = 2; // so the hole_radius (a) = 1
 
 		const types::boundary_id boundary_id_minus_X;// = 5;
 		const types::boundary_id boundary_id_minus_Y;// = 3;
@@ -302,7 +302,7 @@ namespace QuarterHyperCube_Merged
 			else	// for the standard case of AMR refine the grid as specified in the ...
 				tria_2d_not_flat.refine_global(parameter.nbr_global_refinements);	// ...Parameter.prm file; has to be refined before the manifolds are deleted again
 
-			AssertThrow(parameter.nbr_holeEdge_refinements==0, ExcMessage("QuarterPlate mesh creation: Sorry, right now you cannot use hole edge refinements."));
+//			AssertThrow(parameter.nbr_holeEdge_refinements==0, ExcMessage("QuarterPlate mesh creation: Sorry, right now you cannot use hole edge refinements."));
 
 			tria_2d_not_flat.reset_manifold(10); // Clear manifold
 
@@ -411,7 +411,7 @@ namespace QuarterHyperCube_Merged
 			else	// for the standard case of AMR refine the grid as specified in the ...
 				tria_2d_not_flat.refine_global(parameter.nbr_global_refinements);	// ...Parameter.prm file; has to be refined before the manifolds are deleted again
 
-			AssertThrow(parameter.nbr_holeEdge_refinements==0, ExcMessage("QuarterPlate mesh creation: Sorry, right now you cannot use hole edge refinements."));
+//			AssertThrow(parameter.nbr_holeEdge_refinements==0, ExcMessage("QuarterPlate mesh creation: Sorry, right now you cannot use hole edge refinements."));
 			// The following won't work because the created hanging nodes are not saved, hence no constraints are put upon them
 	//		// pre-refinement of the inner area (around the hole edge)
 	//		 for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
@@ -505,6 +505,18 @@ namespace QuarterHyperCube_Merged
 				else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
 				{
 					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);	// the bottom edge
+
+					for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
+					{
+					 if (std::abs(cell->vertex(vertex)[enums::y] - 0) < search_tolerance)
+					  if (std::abs(cell->vertex(vertex)[enums::x] - parameter.holeRadius) < search_tolerance)
+					  {
+						  // We found the cell that lies at the bottom edge next to the hole (bottom left corner)
+						  cell->set_material_id( enums::tracked_QP );
+						  break;
+					  }
+					}
+
 				}
 				else if (std::abs(cell->face(face)->center()[1] - ratio_width_To_holeRadius) < search_tolerance)
 				{
@@ -513,7 +525,7 @@ namespace QuarterHyperCube_Merged
 				else
 				{
 					for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
-					  if (std::abs(cell->vertex(vertex).distance(centre) - parameters_internal.hole_diameter/2.0) < search_tolerance)
+					  if (std::abs(cell->vertex(vertex).distance(centre) - parameter.holeRadius) < search_tolerance)
 					  {
 						  cell->face(face)->set_boundary_id(parameters_internal.boundary_id_hole);	// the hole edge
 						  break;
@@ -522,7 +534,7 @@ namespace QuarterHyperCube_Merged
 
 				//Set manifold IDs
 				for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
-				  if (std::abs(cell->vertex(vertex).distance(centre) - parameters_internal.hole_diameter/2.0) < search_tolerance)
+				  if (std::abs(cell->vertex(vertex).distance(centre) - parameter.holeRadius) < search_tolerance)
 				  {
 					  cell->face(face)->set_manifold_id(parameters_internal.manifold_id_hole);
 					  break;
@@ -560,6 +572,27 @@ namespace QuarterHyperCube_Merged
 //			}
 //			triangulation.execute_coarsening_and_refinement();
 //		}
+
+		// pre-refinement of the damaged area (around y=0)
+		for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
+		{
+			for (typename Triangulation<dim>::active_cell_iterator
+						 cell = triangulation.begin_active();
+						 cell != triangulation.end(); ++cell)
+			{
+				double distance2D = std::sqrt( cell->center()[0]*cell->center()[0] + cell->center()[1]*cell->center()[1] );
+
+				for ( unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; face++ )
+				{
+					if ( cell->center()[enums::y] < 20 )
+					{
+						cell->set_refine_flag();
+						break;
+					}
+				}
+			}
+			triangulation.execute_coarsening_and_refinement();
+		}
 
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 		/*
@@ -653,6 +686,17 @@ namespace QuarterHyperCube_Merged
 				else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
 				{
 					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+					for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
+					{
+					 if (std::abs(cell->vertex(vertex)[enums::y] - 0) < search_tolerance)
+						if (std::abs(cell->vertex(vertex)[enums::z] - 0) < search_tolerance)
+						  if (std::abs(cell->vertex(vertex)[enums::x] - parameter.holeRadius) < search_tolerance)
+						  {
+							  // We found the cell that lies at the bottom edge next to the hole (bottom left corner)
+							  cell->set_material_id( enums::tracked_QP );
+							  break;
+						  }
+					}
 				}
 				else if (std::abs(cell->face(face)->center()[1] - ratio_width_To_holeRadius) < search_tolerance)
 				{
@@ -673,7 +717,7 @@ namespace QuarterHyperCube_Merged
 					 //Project the cell vertex to the XY plane and test the distance from the cylinder axis
 						Point<dim> vertex_proj = cell->vertex(vertex);
 						vertex_proj[2] = 0.0;
-						if (std::abs(vertex_proj.distance(centre) - parameters_internal.hole_diameter/2.0) < search_tolerance)
+						if (std::abs(vertex_proj.distance(centre) - parameter.holeRadius) < search_tolerance)
 						{
 							cell->face(face)->set_boundary_id(parameters_internal.boundary_id_hole);
 							break;
@@ -687,7 +731,7 @@ namespace QuarterHyperCube_Merged
 					//Project the cell vertex to the XY plane and test the distance from the cylinder axis
 					Point<dim> vertex_proj = cell->vertex(vertex);
 					vertex_proj[2] = 0.0;
-					if (std::abs(vertex_proj.distance(centre) - parameters_internal.hole_diameter/2.0) < search_tolerance)
+					if (std::abs(vertex_proj.distance(centre) - parameter.holeRadius) < search_tolerance)
 					{
 						//Set manifold ID on face and edges
 						cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_hole);

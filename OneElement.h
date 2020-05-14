@@ -43,38 +43,6 @@ namespace OneElement
 	};
 
 
-// 2D grid
-	template <int dim>
-	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
-	{
-		AssertThrow( false, ExcMessage("The One Element mesh has not yet been implemented for 2D. Use either 3D or simply implement it yourself."));
-
-		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-		/*
-		{
-			std::ofstream out ("grid-2d_quarter_plate_merged.eps");
-			GridOut grid_out;
-			GridOutFlags::Eps<2> eps_flags;
-			eps_flags.line_width = 0.1;
-			grid_out.set_flags (eps_flags);
-			grid_out.write_eps (triangulation, out);
-			std::cout << "Grid written to grid-2d_quarter_plate_merged.eps" << std::endl;
-			std::cout << "nElem: " << triangulation.n_active_cells() << std::endl;
-			AssertThrow(false,ExcMessage("ddd"));
-		}
-
-		{
-			std::ofstream out_ucd("Grid-2d_quarter_plate_merged.inp");
-			GridOut grid_out;
-			GridOutFlags::Ucd ucd_flags(true,true,true);
-			grid_out.set_flags(ucd_flags);
-			grid_out.write_ucd(triangulation, out_ucd);
-			std::cout<<"Mesh written to Grid-2d_quarter_plate_merged.inp "<<std::endl;
-		}
-		*/
-	}
-
-
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
@@ -206,8 +174,6 @@ namespace OneElement
 	}
 
 
-
-
 // 3d grid
 	template <int dim>
 	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
@@ -296,6 +262,107 @@ namespace OneElement
 			}
 
 			AssertThrow(found_cell, ExcMessage("OneElement: Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
+		}
+
+
+		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
+		/*
+		{
+			std::ofstream out ("grid-3d_quarter_plate_merged.eps");
+			GridOut grid_out;
+			grid_out.write_eps (triangulation, out);
+			std::cout << "Grid written to grid-3d_quarter_plate_merged.eps" << std::endl;
+		}
+		{
+			std::ofstream out_ucd("Grid-3d_quarter_plate_merged.inp");
+			GridOut grid_out;
+			GridOutFlags::Ucd ucd_flags(true,true,true);
+			grid_out.set_flags(ucd_flags);
+			grid_out.write_ucd(triangulation, out_ucd);
+			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
+		}
+		*/
+	}
+
+// 2d grid
+	template <int dim>
+	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+	{
+		parameterCollection parameters_internal ( Vec_boundary_id_collection );
+
+		const double search_tolerance = parameters_internal.search_tolerance;
+
+		const double width = 1; // unit cube
+
+		GridGenerator::hyper_cube(triangulation);
+
+		//Clear boundary ID's
+		for (typename Triangulation<dim>::active_cell_iterator
+			 cell = triangulation.begin_active();
+			 cell != triangulation.end(); ++cell)
+		{
+			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+			  if (cell->face(face)->at_boundary())
+			  {
+				  cell->face(face)->set_all_boundary_ids(0);
+			  }
+		}
+
+		//Set boundary IDs and and manifolds
+		const Point<dim> centre (0,0);
+		for (typename Triangulation<dim>::active_cell_iterator
+			 cell = triangulation.begin_active();
+			 cell != triangulation.end(); ++cell)
+		{
+			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+			  if (cell->face(face)->at_boundary())
+			  {
+				//Set boundary IDs
+				if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
+				{
+					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);
+				}
+				else if (std::abs(cell->face(face)->center()[0] - width) < search_tolerance)
+				{
+					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_X);
+				}
+				else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
+				{
+					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+				}
+				else if (std::abs(cell->face(face)->center()[1] - width) < search_tolerance)
+				{
+					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Y);
+				}
+				else
+				{
+					AssertThrow(false, ExcMessage("OneElement - make_grid 2D: Found an unidentified face at the boundary. Maybe it slipt through the assignment or that face is simply not needed. So either check the implementation or comment this line in the code"));
+				}
+			  }
+		}
+
+		triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
+
+		if ( triangulation.n_active_cells()>1)
+		{
+			bool found_cell=false;
+			for (typename Triangulation<dim>::active_cell_iterator
+						 cell = triangulation.begin_active();
+						 cell != triangulation.end(); ++cell)
+			{
+				for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+				  if ( (cell->vertex(vertex)).distance(centre)<1e-12 )
+				  {
+					  cell->set_material_id(1);
+					  found_cell = true;
+					  break;
+				  }
+
+				if ( found_cell )
+					break;
+			}
+
+			AssertThrow(found_cell, ExcMessage("OneElement: Was not able to identify the cell at the origin(0,0). Please recheck the triangulation or adapt the code."));
 		}
 
 

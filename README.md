@@ -1,6 +1,10 @@
 # Numerical_examples_in_dealii
 A collection of different numerical examples implemented in deal.ii
 
+"A numerical example is worth a thousand equations." [Frans Paul VAN DER MEER, Dissertation-Propositions]
+
+... and takes about as many lines of code.
+
 ## ToDo
 * add a few pictures of the meshes here
 * add a documentation (input arguments, interface)
