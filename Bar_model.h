@@ -9,6 +9,8 @@
 #include <fstream>
 #include <cmath>
 
+#include "../MA-Code/enumerator_list.h"
+
 using namespace dealii;
 
 namespace BarModel
@@ -258,6 +260,7 @@ namespace BarModel
 					else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
 					{
 						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+//						cell->set_material_id( enums::tracked_QP );
 					}
 					else if (std::abs(cell->face(face)->center()[1] - height) < search_tolerance)
 					{
@@ -310,7 +313,9 @@ namespace BarModel
 					 // Find cells that lay on the xz-plane (y=0)
 					  if ( std::abs(cell->vertex(vertex)[1]) < 1 ) // vs 1e-12 used previously
 					  {
-						  cell->set_material_id(1);
+						  // Avoid overwriting the tracked cell
+						  if ( cell->material_id() != enums::tracked_QP )
+							  cell->set_material_id(1);
 						  found_cell = true;
 						  break;
 					  }
