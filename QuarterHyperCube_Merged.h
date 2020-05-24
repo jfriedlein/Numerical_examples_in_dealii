@@ -742,6 +742,27 @@ namespace QuarterHyperCube_Merged
 		}
 
 
+		// pre-refinement of the damaged area (around y=0)
+		for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
+		{
+			for (typename Triangulation<dim>::active_cell_iterator
+						 cell = triangulation.begin_active();
+						 cell != triangulation.end(); ++cell)
+			{
+				double distance2D = std::sqrt( cell->center()[0]*cell->center()[0] + cell->center()[1]*cell->center()[1] );
+
+				for ( unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; face++ )
+				{
+					if ( cell->center()[enums::y] < 30 )
+					{
+						cell->set_refine_flag();
+						break;
+					}
+				}
+			}
+			triangulation.execute_coarsening_and_refinement();
+		}
+
 
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 		/*
