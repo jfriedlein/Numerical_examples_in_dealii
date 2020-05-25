@@ -189,14 +189,14 @@ namespace Rod
 	 */
 	template <int dim>
 	void make_grid (
-						Triangulation<3> &triangulation, std::vector<unsigned int> Vec_boundary_id_collection
+						Triangulation<3> &triangulation, std::vector<unsigned int> Vec_boundary_id_collection,
 						const double &length_of_the_entireRod,
 						const double &radius_of_the_entireRod,
 						const double &length_of_the_entireNotchedArea,
 						const double &radius_reductionFactor_in_notchedArea,
 						const unsigned int n_additonal_refinements_in_y=1,
 						const unsigned int n_global_refinements=0,
-						const int n_max_of_elements_in_the_coarse_area = 6,
+						const int n_max_of_elements_in_the_coarse_area = 6
 				   )
 
 	{
@@ -205,8 +205,8 @@ namespace Rod
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
-		const double half_length = length_of_the_fullRod/2.;
-		const double radius = radius_of_the_fullRod;
+		const double half_length = length_of_the_entireRod/2.;
+		const double radius = radius_of_the_entireRod;
 		const double half_notch_length = length_of_the_entireNotchedArea/2.;
 		const double notch_radius = radius_reductionFactor_in_notchedArea * radius;
 		const unsigned int n_additional_refinements = n_additonal_refinements_in_y;
