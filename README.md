@@ -6,6 +6,7 @@ A collection of different numerical examples implemented in deal.ii
 ... and takes about as many lines of code.
 
 ## ToDo
+* add a note on the difference between the qplate and the infinite plate (maybe add analytical solution code from PA)
 * add a few pictures of the meshes here
 * add a documentation (input arguments, interface)
 * update the QPlate grid with the new deal.ii function plate_with_a_hole
