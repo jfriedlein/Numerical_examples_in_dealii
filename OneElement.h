@@ -240,6 +240,36 @@ namespace OneElement
 			  }
 		}
 
+
+		// Distortion
+		if ( /*distortion*/ true )
+		{
+				Point<3> x1y1z1 (1,1,1);
+				Point<3> shift_of_x1y1z1 (-0.5,0,-0.5);
+				Point<3> x0y1z1 (0,1,1);
+				Point<3> shift_of_x0y1z1 (0,0,-0.25);
+				unsigned int shifted_node = 0;
+			for (typename Triangulation<dim>::active_cell_iterator
+			   cell = triangulation.begin_active();
+			   cell != triangulation.end(); ++cell)
+			{
+			  for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_cell; ++vertex )
+			  {
+				  if ( cell->vertex(vertex).distance(x1y1z1) < 1e-12/*search_tolerance*/ )
+				  {
+					  cell->vertex(vertex) += shift_of_x1y1z1;
+					  shifted_node += 1; // -> We have shifted at least a single node
+				  }
+				  else if ( cell->vertex(vertex).distance(x0y1z1) < 1e-12/*search_tolerance*/ )
+				  {
+					  cell->vertex(vertex) += shift_of_x0y1z1;
+					  shifted_node += 1; // -> We have shifted at least a single node
+				  }
+			  }
+			}
+			AssertThrow( shifted_node == 2, ExcMessage("OneElementTest<< Distortion, we only shifted "+std::to_string(shifted_node)+" instead of 2."));
+		}
+
 		triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
 		if ( triangulation.n_active_cells()>1)
