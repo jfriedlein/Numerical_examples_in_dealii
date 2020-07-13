@@ -580,11 +580,9 @@ namespace QuarterHyperCube_Merged
 						 cell = triangulation.begin_active();
 						 cell != triangulation.end(); ++cell)
 			{
-				double distance2D = std::sqrt( cell->center()[0]*cell->center()[0] + cell->center()[1]*cell->center()[1] );
-
 				for ( unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; face++ )
 				{
-					if ( cell->center()[enums::y] < 30 )
+					if ( cell->center()[enums::y] < width/4. )
 					{
 						cell->set_refine_flag();
 						break;
