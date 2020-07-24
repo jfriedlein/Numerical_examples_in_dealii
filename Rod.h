@@ -15,33 +15,27 @@
 using namespace dealii;
 
 namespace Rod
+/*
+ * 1/8 of a notched rod in 3D and the axisymmetric half-model in 2D
+ *
+ * CERTIFIED TO STANDARD numExS07 (200724)
+ */
 {
-	class parameterCollection
-	{
-	public:
-		parameterCollection( std::vector<unsigned int> Vec_boundary_id_collection /*[5,3,6,4,1]*/)
-		:
-			boundary_id_minus_X(Vec_boundary_id_collection[0]),
-			boundary_id_minus_Y(Vec_boundary_id_collection[1]),
-			boundary_id_plus_X (Vec_boundary_id_collection[2]),
-			boundary_id_plus_Y (Vec_boundary_id_collection[3]),
-			boundary_id_minus_Z(Vec_boundary_id_collection[4])
-		{
-		}
+	// The loading direction: \n
+	// In which coordinate direction the load shall be applied, so x/y/z.
+	 const unsigned int loading_direction = enums::y;
 
-		const types::boundary_id boundary_id_minus_X;// = 5;
-		const types::boundary_id boundary_id_minus_Y;// = 3;
-		const types::boundary_id boundary_id_plus_X; // = 6;
-		const types::boundary_id boundary_id_plus_Y; // = 4;
+	// The loaded faces:
+	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus;
+	 //const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_xPlus;
 
-		const types::boundary_id boundary_id_minus_Z;// = 1;
-		const types::boundary_id boundary_id_plus_Z =  2;
-
+	// Some internal parameters
+	 struct parameterCollection
+	 {
 		const types::manifold_id manifold_id_surf = 10;
 
 		const double search_tolerance = 1e-12;
-	};
-
+	 };
 
 	/*
 	 * Shift a layer of vertices of the triangulation at the coord position \a initial_pos to the position \a new_pos
@@ -189,7 +183,7 @@ namespace Rod
 	 */
 	template <int dim>
 	void make_grid (
-						Triangulation<3> &triangulation, std::vector<unsigned int> Vec_boundary_id_collection,
+						Triangulation<3> &triangulation,
 						const double &length_of_the_entireRod,
 						const double &radius_of_the_entireRod,
 						const double &length_of_the_entireNotchedArea,
@@ -201,7 +195,7 @@ namespace Rod
 
 	{
 		// parameterCollection that contains the boundary ids
-		 parameterCollection parameters_internal ( Vec_boundary_id_collection );
+		 parameterCollection parameters_internal;
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
@@ -271,16 +265,16 @@ namespace Rod
 			  {
 				// Cell at the x0-plane
 				 if (std::abs(cell->face(face)->center()[x] - 0.0) < search_tolerance)
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);
+					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 				// Cell at the y0-plane
 				 else if (std::abs(cell->face(face)->center()[y] - 0.0) < search_tolerance)
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+						cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
 				// Cell at the z0-plane
 				 else if (std::abs(cell->face(face)->center()[z] - 0.0) < search_tolerance)
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Z);
+						cell->face(face)->set_boundary_id(enums::id_boundary_zMinus);
 				// Cell at the other end of the rod
 				 else if (std::abs(cell->face(face)->center()[y] - half_length) < search_tolerance)
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Y);
+						cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
 			  }
 		 }
 
@@ -396,11 +390,11 @@ namespace Rod
 
 
 	template <int dim>
-		void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+		void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
 
 		{
 			// parameterCollection that contains the boundary ids
-			 parameterCollection parameters_internal ( Vec_boundary_id_collection );
+			 parameterCollection parameters_internal;
 
 			const double search_tolerance = parameters_internal.search_tolerance;
 
@@ -473,16 +467,16 @@ namespace Rod
 				  {
 					// Cell at the x0-plane
 					 if (std::abs(cell->face(face)->center()[x] - 0.0) < search_tolerance)
-						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);
+						cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 					// Cell at the y0-plane
 					 else if (std::abs(cell->face(face)->center()[y] - 0.0) < search_tolerance)
-						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+							cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
 					// Cell at the z0-plane
 					 else if (std::abs(cell->face(face)->center()[z] - 0.0) < search_tolerance)
-						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Z);
+							cell->face(face)->set_boundary_id(enums::id_boundary_zMinus);
 					// Cell at the other end of the rod
 					 else if (std::abs(cell->face(face)->center()[y] - half_length) < search_tolerance)
-						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Y);
+							cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
 				  }
 			}
 
@@ -599,7 +593,7 @@ namespace Rod
 	
 	// 2d grid
 	template <int dim>
-	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
 		/*
 		 * Input arguments:
@@ -608,7 +602,7 @@ namespace Rod
 		 * * parameter.width,holeRadius,notchWidth,ratio_x,nbr_holeEdge_refinements,nbr_global_refinements
 		 */
 
-		parameterCollection parameters_internal ( Vec_boundary_id_collection );
+		parameterCollection parameters_internal;
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
@@ -623,6 +617,7 @@ namespace Rod
 		 const double R = ( half_notch_length*half_notch_length + (radius - notch_radius)*(radius - notch_radius) )
 						  / ( 2.*(radius - notch_radius) );
 
+		 // @todo Somehow merge this and similar enumerator with the global enumerator_list (maybe use flags to detect whether a global enum already exists)
 		enum enum_coord_directions
 		{
 			x = 0, y = 1
@@ -662,13 +657,13 @@ namespace Rod
 			  {
 				// Cell at the x0-plane
 				 if (std::abs(cell->face(face)->center()[x] - 0.0) < search_tolerance)
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);
+					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 				// Cell at the y0-plane
 				 else if (std::abs(cell->face(face)->center()[y] - 0.0) < search_tolerance)
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+						cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
 				// Cell at the other end of the rod
 				 else if (std::abs(cell->face(face)->center()[y] - half_length) < search_tolerance)
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Y);
+						cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
 			  }
 		}
 
@@ -757,7 +752,7 @@ namespace Rod
 	template<int dim>
 		void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
 								const bool &apply_dirichlet_bc, double &current_load_increment,
-								const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+								const Parameter::GeneralParameters &parameter)
 		{
 			/* inputs:
 			 * dof_handler_ref,
@@ -773,20 +768,18 @@ namespace Rod
 			//		on y0_plane for symmetry (displacement_in_y = 0)
 			//		on z0_plane for symmetry (displacement_in_z = 0)
 
-			parameterCollection parameters_internal ( Vec_boundary_id_collection );
+			parameterCollection parameters_internal;
 
 			const FEValuesExtractors::Vector displacement(0);
 			const FEValuesExtractors::Scalar x_displacement(0);
 			const FEValuesExtractors::Scalar y_displacement(1);
 
 			// on X0 plane
-			const int boundary_id_X0 = parameters_internal.boundary_id_minus_X;
-
 			if (apply_dirichlet_bc == true )
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_X0,
+															enums::id_boundary_xMinus,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(x_displacement)
@@ -796,7 +789,7 @@ namespace Rod
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_X0,
+															enums::id_boundary_xMinus,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(x_displacement)
@@ -804,13 +797,11 @@ namespace Rod
 			}
 
 			// on Y0 edge
-			const int boundary_id_Y0 = parameters_internal.boundary_id_minus_Y;
-
 			if (apply_dirichlet_bc == true )
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_Y0,
+															enums::id_boundary_yMinus,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(y_displacement)
@@ -820,7 +811,7 @@ namespace Rod
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_Y0,
+															enums::id_boundary_yMinus,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(y_displacement)
@@ -831,13 +822,12 @@ namespace Rod
 			if ( dim==3 )
 			{
 				const FEValuesExtractors::Scalar z_displacement(2);
-				const int boundary_id_Z0 = parameters_internal.boundary_id_minus_Z;
 
 				if (apply_dirichlet_bc == true )
 				{
 					VectorTools::interpolate_boundary_values(
 																dof_handler_ref,
-																boundary_id_Z0,
+																enums::id_boundary_zMinus,
 																ZeroFunction<dim> (n_components),
 																constraints,
 																fe.component_mask(z_displacement)
@@ -847,7 +837,7 @@ namespace Rod
 				{
 					VectorTools::interpolate_boundary_values(
 																dof_handler_ref,
-																boundary_id_Z0,
+																enums::id_boundary_zMinus,
 																ZeroFunction<dim> (n_components),
 																constraints,
 																fe.component_mask(z_displacement)
@@ -857,14 +847,12 @@ namespace Rod
 
 			if ( parameter.driver == enums::Dirichlet )
 			{
-				const int boundary_id_top = parameters_internal.boundary_id_plus_Y;
-
 				// on top edge
 				if (apply_dirichlet_bc == true )
 				{
 					VectorTools::interpolate_boundary_values(
 																dof_handler_ref,
-																boundary_id_top,
+																id_boundary_load,
 																ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
 																constraints,
 																fe.component_mask(y_displacement)
@@ -874,7 +862,7 @@ namespace Rod
 				{
 					VectorTools::interpolate_boundary_values(
 																dof_handler_ref,
-																boundary_id_top,
+																id_boundary_load,
 																ZeroFunction<dim> (n_components),
 																constraints,
 																fe.component_mask(y_displacement)

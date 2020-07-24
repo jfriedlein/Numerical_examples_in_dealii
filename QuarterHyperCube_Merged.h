@@ -14,39 +14,33 @@
 using namespace dealii;
 
 namespace QuarterHyperCube_Merged
+/*
+ * A quarter of a plate with hole in 2D or 1/8 in 3D
+ *
+ * CERTIFIED TO STANDARD numExS07 (200724)
+ */
 {
-	class parameterCollection
-	{
-	public:
-		parameterCollection( std::vector<unsigned int> Vec_boundary_id_collection /*[5,3,6,4,1]*/)
-		:
-			boundary_id_minus_X(Vec_boundary_id_collection[0]),
-			boundary_id_minus_Y(Vec_boundary_id_collection[1]),
-			boundary_id_plus_X (Vec_boundary_id_collection[2]),
-			boundary_id_plus_Y (Vec_boundary_id_collection[3]),
-			boundary_id_minus_Z(Vec_boundary_id_collection[4])
-		{
-		}
+	// The loading direction: \n
+	// In which coordinate direction the load shall be applied, so x/y/z.
+	 const unsigned int loading_direction = enums::y;
 
-		const types::boundary_id boundary_id_minus_X;// = 5;
-		const types::boundary_id boundary_id_minus_Y;// = 3;
-		const types::boundary_id boundary_id_plus_X; // = 6;
-		const types::boundary_id boundary_id_plus_Y; // = 4;
+	// The loaded faces:
+	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus;
+	 const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_xPlus;
 
-		const types::boundary_id boundary_id_minus_Z;// = 1;
-		const types::boundary_id boundary_id_plus_Z =  2;
+	// Some internal parameters
+	 struct parameterCollection
+	 {
 		const types::boundary_id boundary_id_hole = 10;
 		const types::manifold_id manifold_id_hole = 10;
 
 		const double search_tolerance = 1e-12;
-	};
-
-
+	 };
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double>  &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
 							const bool &apply_dirichlet_bc, const double &current_load_increment,
-							const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+							const Parameter::GeneralParameters &parameter )
 	{
 		/* inputs:
 		 * dof_handler_ref,
@@ -55,8 +49,6 @@ namespace QuarterHyperCube_Merged
 		 * constraints
 		 * current_load_increment
 		 */
-
-		parameterCollection parameters_internal ( Vec_boundary_id_collection );
 
 		const FEValuesExtractors::Vector displacement(0);
 		const FEValuesExtractors::Scalar x_displacement(0);
@@ -68,13 +60,11 @@ namespace QuarterHyperCube_Merged
 		//		on y0_plane for symmetry (displacement_in_y = 0)
 
 		// on left edge
-		const int boundary_id_X0 = parameters_internal.boundary_id_minus_X;
-
 		if (apply_dirichlet_bc == true )
 		{
 			VectorTools::interpolate_boundary_values(
 														dof_handler_ref,
-														boundary_id_X0,
+														enums::id_boundary_xMinus,
 														ZeroFunction<dim> (n_components),
 														constraints,
 														fe.component_mask(x_displacement)
@@ -84,7 +74,7 @@ namespace QuarterHyperCube_Merged
 		{
 			VectorTools::interpolate_boundary_values(
 														dof_handler_ref,
-														boundary_id_X0,
+														enums::id_boundary_xMinus,
 														ZeroFunction<dim> (n_components),
 														constraints,
 														fe.component_mask(x_displacement)
@@ -92,13 +82,11 @@ namespace QuarterHyperCube_Merged
 		}
 
 		// on bottom edge
-		const int boundary_id_Y0 = parameters_internal.boundary_id_minus_Y;
-
 		if (apply_dirichlet_bc == true )
 		{
 			VectorTools::interpolate_boundary_values(
 														dof_handler_ref,
-														boundary_id_Y0,
+														enums::id_boundary_yMinus,
 														ZeroFunction<dim> (n_components),
 														constraints,
 														fe.component_mask(y_displacement)
@@ -108,7 +96,7 @@ namespace QuarterHyperCube_Merged
 		{
 			VectorTools::interpolate_boundary_values(
 														dof_handler_ref,
-														boundary_id_Y0,
+														enums::id_boundary_yMinus,
 														ZeroFunction<dim> (n_components),
 														constraints,
 														fe.component_mask(y_displacement)
@@ -119,13 +107,12 @@ namespace QuarterHyperCube_Merged
 		if ( dim==3 )
 		{
 			const FEValuesExtractors::Scalar z_displacement(2);
-			const int boundary_id_Z0 = parameters_internal.boundary_id_minus_Z;
 
 			if (apply_dirichlet_bc == true )
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_Z0,
+															enums::id_boundary_zMinus,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(z_displacement)
@@ -135,7 +122,7 @@ namespace QuarterHyperCube_Merged
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_Z0,
+															enums::id_boundary_zMinus,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(z_displacement)
@@ -144,13 +131,11 @@ namespace QuarterHyperCube_Merged
 
 			if ( false/*apply sym BC on positive z-face also*/ )
 			{
-				const int boundary_id_Zplus = parameters_internal.boundary_id_plus_Z;
-
 				if (apply_dirichlet_bc == true )
 				{
 					VectorTools::interpolate_boundary_values(
 																dof_handler_ref,
-																boundary_id_Zplus,
+																enums::id_boundary_zPlus,
 																ZeroFunction<dim> (n_components),
 																constraints,
 																fe.component_mask(z_displacement)
@@ -160,7 +145,7 @@ namespace QuarterHyperCube_Merged
 				{
 					VectorTools::interpolate_boundary_values(
 																dof_handler_ref,
-																boundary_id_Zplus,
+																enums::id_boundary_zPlus,
 																ZeroFunction<dim> (n_components),
 																constraints,
 																fe.component_mask(z_displacement)
@@ -171,15 +156,12 @@ namespace QuarterHyperCube_Merged
 
 		if ( parameter.driver == 2/*Dirichlet*/ )
 		{
-			const int boundary_id_top = parameters_internal.boundary_id_plus_Y;
-
-
-			// on top edge
+			// on top/loaded edge
 			if (apply_dirichlet_bc == true )
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_top,
+															id_boundary_load,
 															// ToDo: adapt this to also work for the load_history
 															ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
 															//ConstantFunction<dim> (parameter.pressure_load / nbr_loadsteps/*add only the increment*/, n_components),
@@ -191,7 +173,7 @@ namespace QuarterHyperCube_Merged
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_top,
+															id_boundary_load,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(y_displacement)
@@ -203,11 +185,11 @@ namespace QuarterHyperCube_Merged
 	// ToDo-optimize: use existing DII command	void GridGenerator::plate_with_a_hole
 
 	// to see the effects of the inputs (lengths, refinements, etc) consider using the output (.eps, etc) below
-	void make_2d_quarter_plate_with_hole(Triangulation<2> &tria_2d,
-													 const double half_length,
-													 const double half_width,
-													 const double hole_radius,
-													 const double hole_division_fraction, const Parameter::GeneralParameters &parameter )//, parameterCollection &parameters_internal )
+	void make_2d_quarter_plate_with_hole( Triangulation<2> &tria_2d,
+										  const double half_length,
+										  const double half_width,
+										  const double hole_radius,
+										  const double hole_division_fraction, const Parameter::GeneralParameters &parameter )
 	{
 		const double length = 2.0*half_length;
 		const double width =  2.0*half_width;
@@ -450,9 +432,9 @@ namespace QuarterHyperCube_Merged
 
 // 2D grid
 	template <int dim>
-	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
-		parameterCollection parameters_internal ( Vec_boundary_id_collection );
+		parameterCollection parameters_internal;
 
 		// size of the plate divided by the size of the hole
 		  double ratio_width_To_holeRadius = parameter.width;
@@ -469,7 +451,7 @@ namespace QuarterHyperCube_Merged
 											ratio_width_To_holeRadius,			// length
 											ratio_width_To_holeRadius * 1.0,	// width: *1.0 => square
 											holeRadius,	// hole radius = diameter/2
-										    ratio_x, parameter //, parameters_internal
+										    ratio_x, parameter
 										);
 
 		//Clear boundary ID's
@@ -496,15 +478,15 @@ namespace QuarterHyperCube_Merged
 				//Set boundary IDs
 				if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);	// the left edge
+					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);	// the left edge
 				}
 				else if (std::abs(cell->face(face)->center()[0] - ratio_width_To_holeRadius) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_X); // the right edge
+					cell->face(face)->set_boundary_id(enums::id_boundary_xPlus); // the right edge
 				}
 				else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);	// the bottom edge
+					cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);	// the bottom edge
 
 					for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
 					{
@@ -520,7 +502,7 @@ namespace QuarterHyperCube_Merged
 				}
 				else if (std::abs(cell->face(face)->center()[1] - ratio_width_To_holeRadius) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Y); // the top edge
+					cell->face(face)->set_boundary_id(enums::id_boundary_yPlus); // the top edge
 				}
 				else
 				{
@@ -582,7 +564,7 @@ namespace QuarterHyperCube_Merged
 			{
 				for ( unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; face++ )
 				{
-					if ( cell->center()[enums::y] < width/4. )
+					if ( cell->center()[enums::y] < width/2. )
 					{
 						cell->set_refine_flag();
 						break;
@@ -619,9 +601,9 @@ namespace QuarterHyperCube_Merged
 
 
 	template <int dim>
-	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
-		parameterCollection parameters_internal ( Vec_boundary_id_collection );
+		parameterCollection parameters_internal;
 
 		// size of the plate divided by the size of the hole
 		 double ratio_width_To_holeRadius = parameter.width;
@@ -675,15 +657,15 @@ namespace QuarterHyperCube_Merged
 				//Set boundary IDs
 				if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);
+					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 				}
 				else if (std::abs(cell->face(face)->center()[0] - ratio_width_To_holeRadius) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_X);
+					cell->face(face)->set_boundary_id(enums::id_boundary_xPlus);
 				}
 				else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+					cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
 					for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
 					{
 					 if (std::abs(cell->vertex(vertex)[enums::y] - 0) < search_tolerance)
@@ -698,15 +680,15 @@ namespace QuarterHyperCube_Merged
 				}
 				else if (std::abs(cell->face(face)->center()[1] - ratio_width_To_holeRadius) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Y);
+					cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
 				}
 				else if (std::abs(cell->face(face)->center()[2] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Z);
+					cell->face(face)->set_boundary_id(enums::id_boundary_zMinus);
 				}
 				else if (std::abs(cell->face(face)->center()[2] - parameter.thickness/2.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Z);
+					cell->face(face)->set_boundary_id(enums::id_boundary_zPlus);
 				}
 				else
 				{
@@ -751,7 +733,7 @@ namespace QuarterHyperCube_Merged
 
 				for ( unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; face++ )
 				{
-					if ( cell->center()[enums::y] < 30 )
+					if ( cell->center()[loading_direction] < 30 )
 					{
 						cell->set_refine_flag();
 						break;

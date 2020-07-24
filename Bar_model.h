@@ -14,41 +14,30 @@
 using namespace dealii;
 
 namespace BarModel
+/*
+ * A bar with three symmetry constraints, loaded in y-direction
+ *
+ * CERTIFIED TO STANDARD numExS07 (200724)
+ */
 {
-	class parameterCollection
-	{
-	public:
-		parameterCollection( std::vector<unsigned int> Vec_boundary_id_collection /*[5,3,6,4,1]*/)
-		:
-			boundary_id_minus_X(Vec_boundary_id_collection[0]),
-			boundary_id_minus_Y(Vec_boundary_id_collection[1]),
-			boundary_id_plus_X (Vec_boundary_id_collection[2]),
-			boundary_id_plus_Y (Vec_boundary_id_collection[3]),
-			boundary_id_minus_Z(Vec_boundary_id_collection[4])
-		{
-		}
+	// The loading direction: \n
+	// In which coordinate direction the load shall be applied, so x/y/z.
+	 const unsigned int loading_direction = enums::y;
 
-		const double hole_diameter = 2; // so the hole_radius (a) = 1
+	// The loaded faces:
+	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus;
+	 const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_xPlus;
 
-		const types::boundary_id boundary_id_minus_X;// = 5;
-		const types::boundary_id boundary_id_minus_Y;// = 3;
-		const types::boundary_id boundary_id_plus_X; // = 6;
-		const types::boundary_id boundary_id_plus_Y; // = 4;
-
-		const types::boundary_id boundary_id_minus_Z;// = 1;
-		const types::boundary_id boundary_id_plus_Z =  2;
-
+	// Some internal parameters
+	 struct parameterCollection
+	 {
 		const double search_tolerance = 1e-12;
-
-		// only relevant for 3d grid:
-		  const unsigned int n_repetitions_z = 2;			// nbr of Unterteilungen in z-direction for 3d meshing
-	};
-
+	 };
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
 							const bool &apply_dirichlet_bc, double &current_load_increment,
-							const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+							const Parameter::GeneralParameters &parameter )
 	{
 		/* inputs:
 		 * dof_handler_ref,
@@ -64,20 +53,18 @@ namespace BarModel
 		//		on y0_plane for symmetry (displacement_in_y = 0)
 		//		on z0_plane for symmetry (displacement_in_z = 0)
 
-		parameterCollection parameters_internal ( Vec_boundary_id_collection );
+		parameterCollection parameters_internal;
 
 		const FEValuesExtractors::Vector displacement(0);
 		const FEValuesExtractors::Scalar x_displacement(0);
 		const FEValuesExtractors::Scalar y_displacement(1);
 
 		// on X0 plane
-		const int boundary_id_X0 = parameters_internal.boundary_id_minus_X;
-
 		if (apply_dirichlet_bc == true )
 		{
 			VectorTools::interpolate_boundary_values(
 														dof_handler_ref,
-														boundary_id_X0,
+														enums::id_boundary_xMinus,
 														ZeroFunction<dim> (n_components),
 														constraints,
 														fe.component_mask(x_displacement)
@@ -87,7 +74,7 @@ namespace BarModel
 		{
 			VectorTools::interpolate_boundary_values(
 														dof_handler_ref,
-														boundary_id_X0,
+														enums::id_boundary_xMinus,
 														ZeroFunction<dim> (n_components),
 														constraints,
 														fe.component_mask(x_displacement)
@@ -95,13 +82,11 @@ namespace BarModel
 		}
 
 		// on Y0 edge
-		const int boundary_id_Y0 = parameters_internal.boundary_id_minus_Y;
-
 		if (apply_dirichlet_bc == true )
 		{
 			VectorTools::interpolate_boundary_values(
 														dof_handler_ref,
-														boundary_id_Y0,
+														enums::id_boundary_yMinus,
 														ZeroFunction<dim> (n_components),
 														constraints,
 														fe.component_mask(y_displacement)
@@ -111,7 +96,7 @@ namespace BarModel
 		{
 			VectorTools::interpolate_boundary_values(
 														dof_handler_ref,
-														boundary_id_Y0,
+														enums::id_boundary_yMinus,
 														ZeroFunction<dim> (n_components),
 														constraints,
 														fe.component_mask(y_displacement)
@@ -122,13 +107,12 @@ namespace BarModel
 		if ( dim==3 )
 		{
 			const FEValuesExtractors::Scalar z_displacement(2);
-			const int boundary_id_Z0 = parameters_internal.boundary_id_minus_Z;
 
 			if (apply_dirichlet_bc == true )
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_Z0,
+															enums::id_boundary_zMinus,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(z_displacement)
@@ -138,7 +122,7 @@ namespace BarModel
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_Z0,
+															enums::id_boundary_zMinus,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(z_displacement)
@@ -151,7 +135,7 @@ namespace BarModel
 				{
 					VectorTools::interpolate_boundary_values(
 																dof_handler_ref,
-																parameters_internal.boundary_id_plus_Z,
+																enums::id_boundary_zPlus,
 																ZeroFunction<dim> (n_components),
 																constraints,
 																fe.component_mask(z_displacement)
@@ -161,7 +145,7 @@ namespace BarModel
 				{
 					VectorTools::interpolate_boundary_values(
 																dof_handler_ref,
-																parameters_internal.boundary_id_plus_Z,
+																enums::id_boundary_zPlus,
 																ZeroFunction<dim> (n_components),
 																constraints,
 																fe.component_mask(z_displacement)
@@ -172,14 +156,12 @@ namespace BarModel
 
 		if ( parameter.driver == 2/*Dirichlet*/ ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
 		{
-			const int boundary_id_top = parameters_internal.boundary_id_plus_Y;
-
 			// on top edge
 			if (apply_dirichlet_bc == true )
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_top,
+															id_boundary_load,
 															ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
 															constraints,
 															fe.component_mask(y_displacement)
@@ -189,7 +171,7 @@ namespace BarModel
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_top,
+															id_boundary_load,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(y_displacement)
@@ -199,12 +181,11 @@ namespace BarModel
 	}
 
 
-
 	// 2D grid
 		template <int dim>
-		void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+		void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
 		{
-			parameterCollection parameters_internal ( Vec_boundary_id_collection );
+			parameterCollection parameters_internal;
 
 			const double search_tolerance = parameters_internal.search_tolerance;
 
@@ -251,25 +232,25 @@ namespace BarModel
 					//Set boundary IDs
 					if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
 					{
-						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);
+						cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 					}
 					else if (std::abs(cell->face(face)->center()[0] - width) < search_tolerance)
 					{
-						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_X);
+						cell->face(face)->set_boundary_id(enums::id_boundary_xPlus);
 					}
 					else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
 					{
-						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+						cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
 //						cell->set_material_id( enums::tracked_QP );
 					}
 					else if (std::abs(cell->face(face)->center()[1] - height) < search_tolerance)
 					{
-						cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Y);
+						cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
 					}
 					else
 					{
 						// There are just eight faces, so if we missed one, something went clearly terribly wrong
-						 AssertThrow(false, ExcMessage("BarModel - make_grid 2D: Found an unidentified face at the boundary. Maybe it slipt through the assignment or that face is simply not needed. So either check the implementation or comment this line in the code"));
+						 AssertThrow(false, ExcMessage("BarModel - make_grid 2D<< Found an unidentified face at the boundary. Maybe it slipt through the assignment or that face is simply not needed. So either check the implementation or comment this line in the code"));
 					}
 				  }
 			}
@@ -324,7 +305,7 @@ namespace BarModel
 						break;
 				}
 
-				AssertThrow(found_cell, ExcMessage("BarModel: Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
+				AssertThrow(found_cell, ExcMessage("BarModel<< Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
 			}
 
 
@@ -357,9 +338,9 @@ namespace BarModel
 
 // 3d grid
 	template <int dim>
-	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
-		parameterCollection parameters_internal ( Vec_boundary_id_collection );
+		parameterCollection parameters_internal;
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
@@ -408,32 +389,32 @@ namespace BarModel
 				//Set boundary IDs
 				if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);
+					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 				}
 				else if (std::abs(cell->face(face)->center()[0] - width) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_X);
+					cell->face(face)->set_boundary_id(enums::id_boundary_xPlus);
 				}
 				else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+					cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
 				}
 				else if (std::abs(cell->face(face)->center()[1] - height) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Y);
+					cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
 				}
 				else if (std::abs(cell->face(face)->center()[2] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Z);
+					cell->face(face)->set_boundary_id(enums::id_boundary_zMinus);
 				}
 				else if (std::abs(cell->face(face)->center()[2] - width) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Z);
+					cell->face(face)->set_boundary_id(enums::id_boundary_zPlus);
 				}
 				else
 				{
 					// There are just eight faces, so if we missed one, something went clearly terribly wrong
-					 AssertThrow(false, ExcMessage("BarModel - make_grid 3D: Found an unidentified face at the boundary. Maybe it slipt through the assignment or that face is simply not needed. So either check the implementation or comment this line in the code"));
+					 AssertThrow(false, ExcMessage("BarModel - make_grid 3D<< Found an unidentified face at the boundary. Maybe it slipt through the assignment or that face is simply not needed. So either check the implementation or comment this line in the code"));
 				}
 			  }
 		}
@@ -452,7 +433,7 @@ namespace BarModel
 					  if (cell->face(face)->at_boundary())
 					  {
 						// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
-						if (std::abs(cell->face(face)->center()[1] ) < 1./(nbr_local_ref+1.))
+						if (std::abs(cell->face(face)->center()[loading_direction] ) < 1./(nbr_local_ref+1.))
 						{
 							cell->set_refine_flag();
 							break;
@@ -486,7 +467,7 @@ namespace BarModel
 					break;
 			}
 
-			AssertThrow(found_cell, ExcMessage("BarModel: Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
+			AssertThrow(found_cell, ExcMessage("BarModel<< Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
 		}
 
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid

@@ -12,42 +12,31 @@
 using namespace dealii;
 
 namespace OneElement
+/*
+ * A single element with three symmetry constraints, loaded in y-direction, dimensions 1x1x1
+ *
+ * CERTIFIED TO STANDARD numExS07 (200724)
+ */
 {
-	class parameterCollection
-	{
-	public:
-		parameterCollection( std::vector<unsigned int> Vec_boundary_id_collection /*[5,3,6,4,1]*/)
-		:
-			boundary_id_minus_X(Vec_boundary_id_collection[0]),
-			boundary_id_minus_Y(Vec_boundary_id_collection[1]),
-			boundary_id_plus_X (Vec_boundary_id_collection[2]),
-			boundary_id_plus_Y (Vec_boundary_id_collection[3]),
-			boundary_id_minus_Z(Vec_boundary_id_collection[4])
-		{
-		}
+	// The loading direction: \n
+	// In which coordinate direction the load shall be applied, so x/y/z.
+	 const unsigned int loading_direction = enums::y;
 
-		const double hole_diameter = 2; // so the hole_radius (a) = 1
+	// The loaded faces:
+	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus;
+	 const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_xPlus;
 
-		const types::boundary_id boundary_id_minus_X;// = 5;
-		const types::boundary_id boundary_id_minus_Y;// = 3;
-		const types::boundary_id boundary_id_plus_X; // = 6;
-		const types::boundary_id boundary_id_plus_Y; // = 4;
-
-		const types::boundary_id boundary_id_minus_Z;// = 1;
-		const types::boundary_id boundary_id_plus_Z =  2;
-
+	// Some internal parameters
+	 struct parameterCollection
+	 {
 		const double search_tolerance = 1e-12;
-
-		// only relevant for 3d grid:
-		  const unsigned int n_repetitions_z = 2;			// nbr of Unterteilungen in z-direction for 3d meshing
-	};
-
+	 };
 
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
 							const bool &apply_dirichlet_bc, double &current_load_increment,
-							const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+							const Parameter::GeneralParameters &parameter )
 	{
 		/* inputs:
 		 * dof_handler_ref,
@@ -63,20 +52,16 @@ namespace OneElement
 		//		on y0_plane for symmetry (displacement_in_y = 0)
 		//		on z0_plane for symmetry (displacement_in_z = 0)
 
-		parameterCollection parameters_internal ( Vec_boundary_id_collection );
-
 		const FEValuesExtractors::Vector displacement(0);
 		const FEValuesExtractors::Scalar x_displacement(0);
 		const FEValuesExtractors::Scalar y_displacement(1);
 
 		// on X0 plane
-		const int boundary_id_X0 = parameters_internal.boundary_id_minus_X;
-
 		if (apply_dirichlet_bc == true )
 		{
 			VectorTools::interpolate_boundary_values(
 														dof_handler_ref,
-														boundary_id_X0,
+														enums::id_boundary_xMinus,
 														ZeroFunction<dim> (n_components),
 														constraints,
 														fe.component_mask(x_displacement)
@@ -86,7 +71,7 @@ namespace OneElement
 		{
 			VectorTools::interpolate_boundary_values(
 														dof_handler_ref,
-														boundary_id_X0,
+														enums::id_boundary_xMinus,
 														ZeroFunction<dim> (n_components),
 														constraints,
 														fe.component_mask(x_displacement)
@@ -94,13 +79,11 @@ namespace OneElement
 		}
 
 		// on Y0 edge
-		const int boundary_id_Y0 = parameters_internal.boundary_id_minus_Y;
-
 		if (apply_dirichlet_bc == true )
 		{
 			VectorTools::interpolate_boundary_values(
 														dof_handler_ref,
-														boundary_id_Y0,
+														enums::id_boundary_yMinus,
 														ZeroFunction<dim> (n_components),
 														constraints,
 														fe.component_mask(y_displacement)
@@ -110,7 +93,7 @@ namespace OneElement
 		{
 			VectorTools::interpolate_boundary_values(
 														dof_handler_ref,
-														boundary_id_Y0,
+														enums::id_boundary_yMinus,
 														ZeroFunction<dim> (n_components),
 														constraints,
 														fe.component_mask(y_displacement)
@@ -121,13 +104,12 @@ namespace OneElement
 		if ( dim==3 )
 		{
 			const FEValuesExtractors::Scalar z_displacement(2);
-			const int boundary_id_Z0 = parameters_internal.boundary_id_minus_Z;
 
 			if (apply_dirichlet_bc == true )
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_Z0,
+															enums::id_boundary_zMinus,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(z_displacement)
@@ -137,7 +119,7 @@ namespace OneElement
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_Z0,
+															enums::id_boundary_zMinus,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(z_displacement)
@@ -147,14 +129,12 @@ namespace OneElement
 
 		if ( parameter.driver == 2/*Dirichlet*/ ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
 		{
-			const int boundary_id_top = parameters_internal.boundary_id_plus_Y;
-
 			// on top edge
 			if (apply_dirichlet_bc == true )
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_top,
+															id_boundary_load,
 															ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
 															constraints,
 															fe.component_mask(y_displacement)
@@ -164,7 +144,7 @@ namespace OneElement
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															boundary_id_top,
+															id_boundary_load,
 															ZeroFunction<dim> (n_components),
 															constraints,
 															fe.component_mask(y_displacement)
@@ -176,9 +156,9 @@ namespace OneElement
 
 // 3d grid
 	template <int dim>
-	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
-		parameterCollection parameters_internal ( Vec_boundary_id_collection );
+		parameterCollection parameters_internal;
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
@@ -211,38 +191,38 @@ namespace OneElement
 				//Set boundary IDs
 				if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);
+					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 				}
 				else if (std::abs(cell->face(face)->center()[0] - width) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_X);
+					cell->face(face)->set_boundary_id(enums::id_boundary_xPlus);
 				}
 				else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+					cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
 				}
 				else if (std::abs(cell->face(face)->center()[1] - width) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Y);
+					cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
 				}
 				else if (std::abs(cell->face(face)->center()[2] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Z);
+					cell->face(face)->set_boundary_id(enums::id_boundary_zMinus);
 				}
 				else if (std::abs(cell->face(face)->center()[2] - width) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Z);
+					cell->face(face)->set_boundary_id(enums::id_boundary_zPlus);
 				}
 				else
 				{
-					AssertThrow(false, ExcMessage("OneElement - make_grid 3D: Found an unidentified face at the boundary. Maybe it slipt through the assignment or that face is simply not needed. So either check the implementation or comment this line in the code"));
+					AssertThrow(false, ExcMessage("OneElement - make_grid 3D<< Found an unidentified face at the boundary. Maybe it slipt through the assignment or that face is simply not needed. So either check the implementation or comment this line in the code"));
 				}
 			  }
 		}
 
 
 		// Distortion
-		if ( /*distortion*/ true )
+		if ( /*distortion*/ false )
 		{
 				Point<3> x1y1z1 (1,1,1);
 				Point<3> shift_of_x1y1z1 (-0.5,0,-0.5);
@@ -267,7 +247,7 @@ namespace OneElement
 				  }
 			  }
 			}
-			AssertThrow( shifted_node == 2, ExcMessage("OneElementTest<< Distortion, we only shifted "+std::to_string(shifted_node)+" instead of 2."));
+			AssertThrow( shifted_node == 2, ExcMessage("OneElementTest<< Distortion, we only shifted "+std::to_string(shifted_node)+" instead of 2 vertices."));
 		}
 
 		triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
@@ -291,7 +271,7 @@ namespace OneElement
 					break;
 			}
 
-			AssertThrow(found_cell, ExcMessage("OneElement: Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
+			AssertThrow(found_cell, ExcMessage("OneElement<< Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
 		}
 
 
@@ -318,7 +298,7 @@ namespace OneElement
 	template <int dim>
 	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
 	{
-		parameterCollection parameters_internal ( Vec_boundary_id_collection );
+		parameterCollection parameters_internal;
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
@@ -350,23 +330,23 @@ namespace OneElement
 				//Set boundary IDs
 				if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);
+					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 				}
 				else if (std::abs(cell->face(face)->center()[0] - width) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_X);
+					cell->face(face)->set_boundary_id(enums::id_boundary_xPlus);
 				}
 				else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+					cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
 				}
 				else if (std::abs(cell->face(face)->center()[1] - width) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Y);
+					cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
 				}
 				else
 				{
-					AssertThrow(false, ExcMessage("OneElement - make_grid 2D: Found an unidentified face at the boundary. Maybe it slipt through the assignment or that face is simply not needed. So either check the implementation or comment this line in the code"));
+					AssertThrow(false, ExcMessage("OneElement - make_grid 2D<< Found an unidentified face at the boundary. Maybe it slipt through the assignment or that face is simply not needed. So either check the implementation or comment this line in the code"));
 				}
 			  }
 		}
@@ -392,7 +372,7 @@ namespace OneElement
 					break;
 			}
 
-			AssertThrow(found_cell, ExcMessage("OneElement: Was not able to identify the cell at the origin(0,0). Please recheck the triangulation or adapt the code."));
+			AssertThrow(found_cell, ExcMessage("OneElement<< Was not able to identify the cell at the origin(0,0). Please recheck the triangulation or adapt the code."));
 		}
 
 

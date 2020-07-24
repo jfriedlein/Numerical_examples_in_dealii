@@ -5,7 +5,19 @@ A collection of different numerical examples implemented in deal.ii
 
 ... and takes about as many lines of code.
 
+
+## Changelog
+From the 24.07.2020 we obey a new standard (numExS07).
+
+Major changes:
+* cleanup of boundary ids
+* option to specify the loading direction and the loaded faces
+
+
 ## ToDo
+* add the enumerator_list
+* add an exemplary call to make_constraints, make_grid
+* change the interfaces of the make_grid functions to obtain the same setup as the deal.ii geometries (all dimensions and parameters as explicit input arguments)
 * add a note on the difference between the qplate and the infinite plate (maybe add analytical solution code from PA)
 * add a few pictures of the meshes here
 * add a documentation (input arguments, interface)
@@ -33,3 +45,17 @@ Parameters
 * Number of elements in the cylindrical part in y-direction
 
 <img src="https://github.com/jfriedlein/Numerical_examples_in_dealii/blob/master/images/Rod%20-%20geometry%20notch60.jpg" width="500">
+
+### Quarter/Eight of a plate with hole
+
+### Bar
+
+### One element test (also distorted)
+
+### Tensile specimen SEP1230 (parameterised)
+
+### Three-point beam
+Bending of a notched beam
+
+!!! Not developed anymore, version frozen in March 2020 !!!
+

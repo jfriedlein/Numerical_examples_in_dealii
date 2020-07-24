@@ -13,52 +13,159 @@ using namespace dealii;
 
 namespace tensileSpecimen
 {
-	class parameterCollection
-	{
-	public:
-		parameterCollection( std::vector<unsigned int> Vec_boundary_id_collection /*[5,3,6,4,1]*/)
-		:
-			boundary_id_minus_X(Vec_boundary_id_collection[0]),
-			boundary_id_minus_Y(Vec_boundary_id_collection[1]),
-			boundary_id_plus_Y (Vec_boundary_id_collection[2]),// @todo rework the ids
-			boundary_id_plus_X (Vec_boundary_id_collection[3]), // @todo rework the ids
-			boundary_id_minus_Z(Vec_boundary_id_collection[4])
-		{
-		}
-		
-		parameterCollection() = default;
+	// The loading direction: \n
+	// In which coordinate direction the load shall be applied, so x/y/z.
+	 const unsigned int loading_direction = enums::x;
 
-		const double hole_diameter = 2; // so the hole_radius (a) = 1
+	// The loaded faces:
+	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_xPlus;
+	 //const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_yPlus;
 
-		const types::boundary_id boundary_id_minus_X = 5;
-		const types::boundary_id boundary_id_minus_Y = 3;
-		const types::boundary_id boundary_id_plus_X = 4;
-		const types::boundary_id boundary_id_plus_Y = 6;
-
-		const types::boundary_id boundary_id_minus_Z = 1;
-		const types::boundary_id boundary_id_plus_Z =  2;
-
+	// Some internal parameters
+	 struct parameterCollection
+	 {
 		const types::boundary_id boundary_id_radius_lower = 10;
 		const types::manifold_id manifold_id_radius_lower = 10;
 		
 		const types::boundary_id boundary_id_radius_upper = 11;
 		const types::manifold_id manifold_id_radius_upper = 11;	
-		
+
 		const double search_tolerance = 1e-12;
-
-		// only relevant for 3d grid:
-		  const unsigned int n_repetitions_z = 2;			// nbr of Unterteilungen in z-direction for 3d meshing
-	};
-
-	// The loading direction: \n
-	// In which coordinate direction the load shall be applied, so x/y/z, in this case
-	// the specimen lies flat, so we want to pull it in x-direction.
-	 const unsigned int loading_direction = enums::x;
+	 };
 
 
-// 2D grid
+	template<int dim>
+	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
+							const bool &apply_dirichlet_bc, double &current_load_increment,
+							const Parameter::GeneralParameters &parameter )
+	{
+		/* inputs:
+		 * dof_handler_ref,
+		 * fe
+		 * apply_dirichlet_bc
+		 * constraints
+		 * current_load_increment
+		 */
+
+		// Symmetry constraints:
+		// Update and apply new constraints
+		//		on x0_plane for symmetry (displacement_in_x = 0)
+		//		on y0_plane for symmetry (displacement_in_y = 0)
+		//		on z0_plane for symmetry (displacement_in_z = 0)
+
+		parameterCollection parameters_internal;
+
+		const FEValuesExtractors::Vector displacement(0);
+		const FEValuesExtractors::Scalar x_displacement(0);
+		const FEValuesExtractors::Scalar y_displacement(1);
+
+		// on X0 plane
+		// like a symmetry constraint, because the left part is longer (continous on)
+
+		if (apply_dirichlet_bc == true )
+		{
+			VectorTools::interpolate_boundary_values(
+														dof_handler_ref,
+														enums::id_boundary_xMinus,
+														ZeroFunction<dim> (n_components),
+														constraints,
+														fe.component_mask(x_displacement)
+													);
+		}
+		else	// in the exact same manner
+		{
+			VectorTools::interpolate_boundary_values(
+														dof_handler_ref,
+														enums::id_boundary_xMinus,
+														ZeroFunction<dim> (n_components),
+														constraints,
+														fe.component_mask(x_displacement)
+													);
+		}
+
+		// on Y0 edge
+		// symmetry constraint (only 1/4 of the model is considered)
+
+		if (apply_dirichlet_bc == true )
+		{
+			VectorTools::interpolate_boundary_values(
+														dof_handler_ref,
+														enums::id_boundary_yMinus,
+														ZeroFunction<dim> (n_components),
+														constraints,
+														fe.component_mask(y_displacement)
+													);
+		}
+		else	// in the exact same manner
+		{
+			VectorTools::interpolate_boundary_values(
+														dof_handler_ref,
+														enums::id_boundary_yMinus,
+														ZeroFunction<dim> (n_components),
+														constraints,
+														fe.component_mask(y_displacement)
+													);
+		}
+
+		// on Z0 plane
+		// symmetry constraint in thickness direction
+		if ( dim==3 )
+		{
+			const FEValuesExtractors::Scalar z_displacement(2);
+
+			if (apply_dirichlet_bc == true )
+			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															enums::id_boundary_zMinus,
+															ZeroFunction<dim> (n_components),
+															constraints,
+															fe.component_mask(z_displacement)
+														);
+			}
+			else	// in the exact same manner
+			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															enums::id_boundary_zMinus,
+															ZeroFunction<dim> (n_components),
+															constraints,
+															fe.component_mask(z_displacement)
+														);
+			}
+		}
+
+		if ( parameter.driver == 2/*Dirichlet*/ ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
+		{
+			// on upper edge
+			// @todo Misses clamping, so probably no contraction in y and z, apply this constraint
+			if (apply_dirichlet_bc == true )
+			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															id_boundary_load,
+															ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
+															constraints,
+															fe.component_mask(x_displacement)
+														);
+			}
+			else
+			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															id_boundary_load,
+															ZeroFunction<dim> (n_components),
+															constraints,
+															fe.component_mask(x_displacement)
+														);
+			}
+		}
+	}
+
+
+	// 2D grid
 	template <int dim>
-	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
 		AssertThrow( false, ExcMessage("TensileSpecimen<< Not yet been implemented for 2D. Use either 3D or simply implement it yourself."));
 
@@ -88,147 +195,11 @@ namespace tensileSpecimen
 	}
 
 
-
-	template<int dim>
-	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
-							const bool &apply_dirichlet_bc, double &current_load_increment,
-							const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
-	{
-		/* inputs:
-		 * dof_handler_ref,
-		 * fe
-		 * apply_dirichlet_bc
-		 * constraints
-		 * current_load_increment
-		 */
-
-		// Symmetry constraints:
-		// Update and apply new constraints
-		//		on x0_plane for symmetry (displacement_in_x = 0)
-		//		on y0_plane for symmetry (displacement_in_y = 0)
-		//		on z0_plane for symmetry (displacement_in_z = 0)
-
-		parameterCollection parameters_internal ( Vec_boundary_id_collection );
-
-		const FEValuesExtractors::Vector displacement(0);
-		const FEValuesExtractors::Scalar x_displacement(0);
-		const FEValuesExtractors::Scalar y_displacement(1);
-
-		// on X0 plane
-		// like a symmetry constraint, because the left part is longer (continous on)
-		const int boundary_id_X0 = parameters_internal.boundary_id_minus_X;
-
-		if (apply_dirichlet_bc == true )
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														boundary_id_X0,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-		}
-		else	// in the exact same manner
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														boundary_id_X0,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-		}
-
-		// on Y0 edge
-		// symmetry constraint (only 1/4 of the model is considered)
-		const int boundary_id_Y0 = parameters_internal.boundary_id_minus_Y;
-
-		if (apply_dirichlet_bc == true )
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														boundary_id_Y0,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-		}
-		else	// in the exact same manner
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														boundary_id_Y0,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-		}
-
-		// on Z0 plane
-		// symmetry constraint in thickness direction
-		if ( dim==3 )
-		{
-			const FEValuesExtractors::Scalar z_displacement(2);
-			const int boundary_id_Z0 = parameters_internal.boundary_id_minus_Z;
-
-			if (apply_dirichlet_bc == true )
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															boundary_id_Z0,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
-			else	// in the exact same manner
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															boundary_id_Z0,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
-		}
-
-		if ( parameter.driver == 2/*Dirichlet*/ ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
-		{
-			const int boundary_id_load = parameters_internal.boundary_id_plus_X;
-
-			// on upper edge
-			// @todo Misses clamping, so probably no contraction in y and z, apply this constraint
-			if (apply_dirichlet_bc == true )
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															boundary_id_load,
-															ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
-															constraints,
-															fe.component_mask(x_displacement)
-														);
-			}
-			else
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															boundary_id_load,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(x_displacement)
-														);
-			}
-		}
-	}
-
-
-
 // 3d grid
 	template <int dim>
-	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
-		parameterCollection parameters_internal (Vec_boundary_id_collection);
+		parameterCollection parameters_internal;
 		
 		/*
 		 * parameters:
@@ -281,6 +252,7 @@ namespace tensileSpecimen
 		// Vector containing the number of elements in each dimension
 		 std::vector<unsigned int> repetitions (2);
 		 // @todo Rename \a grid_y_repetitions
+		 // @todo Maybe we want to align the specimen in y-direction, so we would have to change the enums::x .. accessors accordingly
 		 repetitions[enums::x] = parameter.grid_y_repetitions;
 		 repetitions[enums::y] = 2; // minimum for compatibility with prerefined radial parts
 
@@ -302,7 +274,7 @@ namespace tensileSpecimen
 			{
 			   // Set the center point
 				lower_radius_center[enums::x] = - length_parallel/2.;
-				lower_radius_center[enums::y] = hwidth_b + transition_radius; // this makes it tangential to the rectangular part
+				lower_radius_center[enums::y] = hwidth_b + transition_radius; // this makes it tangential to the rectangular part in the middle
 				
 			   // Create the full plate with hole
 				Triangulation<2> tria_plate_hole;
@@ -524,25 +496,25 @@ namespace tensileSpecimen
 				// lower end
 				if (std::abs(cell->face(face)->center()[enums::x] - lower_end) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_X);
+					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 				}
 				// upper end
 				else if (std::abs(cell->face(face)->center()[enums::x] - upper_end) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_X);
+					cell->face(face)->set_boundary_id(enums::id_boundary_xPlus);
 				}
 				// y0 (symmetry)
 				else if (std::abs(cell->face(face)->center()[enums::y] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Y);
+					cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
 				}
 				else if (std::abs(cell->face(face)->center()[2] - 0.0) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_minus_Z);
+					cell->face(face)->set_boundary_id(enums::id_boundary_zMinus);
 				}
 				else if (std::abs(cell->face(face)->center()[2] - hthickness) < search_tolerance)
 				{
-					cell->face(face)->set_boundary_id(parameters_internal.boundary_id_plus_Z);
+					cell->face(face)->set_boundary_id(enums::id_boundary_zPlus);
 				}
 				else
 				{
