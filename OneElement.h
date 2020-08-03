@@ -154,6 +154,28 @@ namespace OneElement
 	}
 
 
+	template<int dim>
+	void shift_vertex_by_vector ( Triangulation<dim> &tria, const std::vector< Point<dim> > &points, const std::vector< Point<dim> > &shift)
+	{
+		unsigned int shifted_node = 0;
+		const unsigned int n_points = points.size();
+		for (typename Triangulation<dim>::active_cell_iterator
+		   cell = tria.begin_active();
+		   cell != tria.end(); ++cell)
+		{
+		  for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_cell; ++vertex )
+			  for ( unsigned int i=0; i<n_points; i++)
+				  if ( cell->vertex(vertex).distance(points[i]) < 1e-12/*search_tolerance*/ )
+				  {
+					  cell->vertex(vertex) += shift[i];
+					  shifted_node += 1; // -> We have shifted at least a single node
+				  }
+		}
+		AssertThrow( shifted_node == n_points, ExcMessage("OneElementTest<< Distortion, we only shifted "+std::to_string(shifted_node)+
+														  " instead of "+std::to_string(n_points)+" vertices."));
+	}
+
+
 // 3d grid
 	template <int dim>
 	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
@@ -220,37 +242,46 @@ namespace OneElement
 			  }
 		}
 
+		triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
 		// Distortion
-		if ( /*distortion*/ false )
+		if ( /*distortion*/ true )
 		{
+			if ( triangulation.n_active_cells()==1 )
+			{
+				std::vector< Point<3> > points_xyz (2);
+				std::vector< Point<3> > shift_dxdydz (2);
+
 				Point<3> x1y1z1 (1,1,1);
 				Point<3> shift_of_x1y1z1 (-0.5,0,-0.5);
 				Point<3> x0y1z1 (0,1,1);
 				Point<3> shift_of_x0y1z1 (0,0,-0.25);
-				unsigned int shifted_node = 0;
-			for (typename Triangulation<dim>::active_cell_iterator
-			   cell = triangulation.begin_active();
-			   cell != triangulation.end(); ++cell)
-			{
-			  for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_cell; ++vertex )
-			  {
-				  if ( cell->vertex(vertex).distance(x1y1z1) < 1e-12/*search_tolerance*/ )
-				  {
-					  cell->vertex(vertex) += shift_of_x1y1z1;
-					  shifted_node += 1; // -> We have shifted at least a single node
-				  }
-				  else if ( cell->vertex(vertex).distance(x0y1z1) < 1e-12/*search_tolerance*/ )
-				  {
-					  cell->vertex(vertex) += shift_of_x0y1z1;
-					  shifted_node += 1; // -> We have shifted at least a single node
-				  }
-			  }
-			}
-			AssertThrow( shifted_node == 2, ExcMessage("OneElementTest<< Distortion, we only shifted "+std::to_string(shifted_node)+" instead of 2 vertices."));
-		}
 
-		triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
+				points_xyz[0] = x1y1z1;
+				points_xyz[1] = x0y1z1;
+				shift_dxdydz[0] = shift_of_x1y1z1;
+				shift_dxdydz[1] = shift_of_x0y1z1;
+
+				shift_vertex_by_vector( triangulation, points_xyz, shift_dxdydz );
+			}
+			else if ( triangulation.n_active_cells()==8 )
+			{
+				std::vector< Point<3> > points_xyz (2);
+				std::vector< Point<3> > shift_dxdydz (2);
+
+				Point<3> x1y1z05 (1,0.5,1);
+				Point<3> shift_of_x1y1z05 (0,0.25,0);
+				Point<3> x0y05z1 (0,0.5,1);
+				Point<3> shift_of_x0y05z1(0,-0.125,0);
+
+				points_xyz[0] = x1y1z05;
+				points_xyz[1] = x0y05z1;
+				shift_dxdydz[0] = shift_of_x1y1z05;
+				shift_dxdydz[1] = shift_of_x0y05z1;
+
+				shift_vertex_by_vector( triangulation, points_xyz, shift_dxdydz );
+			}
+		}
 
 		if ( triangulation.n_active_cells()>1)
 		{
@@ -296,7 +327,7 @@ namespace OneElement
 
 // 2d grid
 	template <int dim>
-	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter, std::vector<unsigned int> Vec_boundary_id_collection )
+	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
 		parameterCollection parameters_internal;
 
