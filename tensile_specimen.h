@@ -459,9 +459,9 @@ namespace tensileSpecimen
  					  cell->face(face)->set_all_boundary_ids(0);
  				  }
  			 }
-		// ************************************************************************************************************		
- 			
- 			
+		// ************************************************************************************************************
+
+
 		// ************************************************************************************************************		
 		// Extrude 2D grid to 3D
 		 GridGenerator::extrude_triangulation( triangulation_2D,
@@ -492,7 +492,7 @@ namespace tensileSpecimen
 			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
 			  if (cell->face(face)->at_boundary())
 			  {
-				//Set boundary IDs
+				// Set boundary IDs
 				// lower end
 				if (std::abs(cell->face(face)->center()[enums::x] - lower_end) < search_tolerance)
 				{
@@ -519,86 +519,83 @@ namespace tensileSpecimen
 				else
 				{
 					for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
-					 {
-					 //Project the cell vertex to the XY plane and test the distance from the cylinder axis
-						Point<dim> vertex_proj = cell->vertex(vertex);
+					{
+					 // Project the cell vertex to the XY plane and test the distance from the cylinder axis
+						Point<dim> vertex_proj = cell->face(face)->vertex(vertex);
 						vertex_proj[enums::z] = 0.0;
-						if ( std::abs(vertex_proj[enums::x]) > ( length_parallel/2. + 5*search_tolerance ) ) // without this we would also assign the manifold to the elements in the center part next to the quarter plate with hole
+						// If the point lies above the inner parallel area ...
+						if ( vertex_proj[enums::x] > ( length_parallel/2. + 5.*search_tolerance ) )
 						{
+							// ... and the radius fits to transition radius
 							if ( std::abs(vertex_proj.distance(upper_radius_center_3D) - transition_radius) < search_tolerance )
 							{
 								cell->face(face)->set_boundary_id(parameters_internal.boundary_id_radius_upper);
+								cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_radius_upper);
 								break;
 							}
-							else if ( std::abs(vertex_proj.distance(lower_radius_center_3D) - transition_radius) < search_tolerance )
+						}
+						// If the point lies below the inner parallel area ...
+						else if ( vertex_proj[enums::x] < - ( length_parallel/2. + 5.*search_tolerance ) )
+						{
+							// ... and the radius fits to transition radius
+							if ( std::abs(vertex_proj.distance(lower_radius_center_3D) - transition_radius) < search_tolerance )
 							{
 								cell->face(face)->set_boundary_id(parameters_internal.boundary_id_radius_lower);
+								cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_radius_lower);
 								break;
 							}
 						}
 					}
 				}
-				
-				//Set manifold IDs
-				for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
-				{
-					//Project the cell vertex to the XY plane and test the distance from the cylinder axis
-					Point<dim> vertex_proj = cell->vertex(vertex);
-					vertex_proj[enums::z] = 0.0;
-					if ( std::abs(vertex_proj[enums::x]) > ( length_parallel/2. + 5*search_tolerance ) )
-					{
-						if ( std::abs(vertex_proj.distance(upper_radius_center_3D) - transition_radius) < search_tolerance )
-						{
-							//Set manifold ID on face and edges
-							cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_radius_upper);
-							break;
-						  }
-						else if ( std::abs(vertex_proj.distance(lower_radius_center_3D) - transition_radius) < search_tolerance )
-						{
-							//Set manifold ID on face and edges
-							cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_radius_lower);
-							break;
-						  }
-					}
-				  }
 			  }
 		}
 
 		// Apply cylindrical manifolds to both radii
 		 Tensor<1,dim> cylinder_axis;
 		 cylinder_axis[enums::z] = 1;
-		 
+
 		 CylindricalManifold<dim> cylindrical_manifold_upper (cylinder_axis, upper_radius_center_3D);
 		 triangulation.set_manifold(parameters_internal.manifold_id_radius_upper, cylindrical_manifold_upper);
-		
+
 		 CylindricalManifold<dim> cylindrical_manifold_lower (cylinder_axis, lower_radius_center_3D);
 		 triangulation.set_manifold(parameters_internal.manifold_id_radius_lower, cylindrical_manifold_lower);
-		
-		 
-		// only refine globally
-		 triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
-		 
-		// refine the cells in the parallel part
-			for ( unsigned int nbr_local_ref=0; nbr_local_ref<parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
+
+		 // "Global" refinements are done solely in the xy-plane
+		  for ( unsigned int nbr_gl_ref=0; nbr_gl_ref < parameter.nbr_global_refinements; nbr_gl_ref++ )
+		  {
+			for (typename Triangulation<dim>::active_cell_iterator
+						 cell = triangulation.begin_active();
+						 cell != triangulation.end(); ++cell)
 			{
-				for (typename Triangulation<dim>::active_cell_iterator
-							 cell = triangulation.begin_active();
-							 cell != triangulation.end(); ++cell)
-				{
-					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-						// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
-						if ( std::abs( cell->face(face)->center()[enums::x] ) <= ( length_parallel/2. + 1e3*search_tolerance ) )
-						{
-							if ( nbr_local_ref==1 || nbr_local_ref==3 || nbr_local_ref==5 || nbr_local_ref==7 ) // even
-								cell->set_refine_flag(RefinementCase<dim>::cut_xy); // refine in x and y-direction
-							else
-								cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the x-direction
-							break;
-						}
-				}
-				triangulation.execute_coarsening_and_refinement();
+				cell->set_refine_flag(RefinementCase<dim>::cut_xy); // refine in x and y-direction
 			}
-		
+			triangulation.execute_coarsening_and_refinement();
+		  }
+		 //triangulation.refine_global(parameter.nbr_global_refinements);
+
+		 // @todo check the use of only anisotropic xy refinements to keep the thickness direction
+		// Refine the cells in the parallel part
+		 for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
+		 {
+			for (typename Triangulation<dim>::active_cell_iterator
+						 cell = triangulation.begin_active();
+						 cell != triangulation.end(); ++cell)
+			{
+				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+					// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
+					if ( std::abs( cell->face(face)->center()[enums::x] ) <= ( length_parallel/2. + 1e3*search_tolerance ) )
+					{
+						// @todo Multiple local anisotropic refinements cause DII to fail, Why?
+//						if ( nbr_local_ref==1 || nbr_local_ref==3 || nbr_local_ref==5 || nbr_local_ref==7 ) // even
+							cell->set_refine_flag();//RefinementCase<dim>::cut_xy); // refine in x and y-direction
+//						else
+//							cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the x-direction
+						break;
+					}
+			}
+			triangulation.execute_coarsening_and_refinement();
+		 }
+
 
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 //		{
