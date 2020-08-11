@@ -1,0 +1,7 @@
+14.04.2020
+	First Standard S04 (Year 202(0), month April (4) 
+    Actual not yet a true standard (just the initial commit)
+
+07.2020
+	Standard S07 (Year 202(0), month July (7)
+    (First true and organised standard)
