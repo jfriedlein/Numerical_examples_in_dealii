@@ -37,6 +37,8 @@ Apply the boundary conditions onto the faces, e.g. symmetry BC.
 ### Rod
 Parameters
 
+Be aware that you can also choose the geometry of the notch (round, sharp), which might affect your results.
+
 * Total length of the rod
 * Radius of the cylindrical part
 * length of the notch
@@ -50,7 +52,8 @@ Parameters
 
 ### Bar
 
-### One element test (also distorted)
+### One element test (also distorted) & Distorted 8 elements
+By setting the number of global refinements to zero, you obtain the one-element test. For number of global refinements equal to 1 (in 3D) you obtain 8 Elements arranged as a cube, which can also be distorted internally (overall still a cube, but distorted but matching elements inside).
 
 ### Tensile specimen SEP1230 (parameterised)
 

@@ -14,6 +14,7 @@ using namespace dealii;
 namespace OneElement
 /*
  * A single element with three symmetry constraints, loaded in y-direction, dimensions 1x1x1
+ * By selecting 1 global refinement we can create the distorted 8 element test
  *
  * CERTIFIED TO STANDARD numExS07 (200724)
  */
@@ -264,20 +265,91 @@ namespace OneElement
 
 				shift_vertex_by_vector( triangulation, points_xyz, shift_dxdydz );
 			}
+			// Distorted 8 elements (Dis8El)
 			else if ( triangulation.n_active_cells()==8 )
 			{
-				std::vector< Point<3> > points_xyz (2);
-				std::vector< Point<3> > shift_dxdydz (2);
+				std::vector< Point<3> > points_xyz (16);
+				std::vector< Point<3> > shift_dxdydz (16);
 
-				Point<3> x1y1z05 (1,0.5,1);
-				Point<3> shift_of_x1y1z05 (0,0.25,0);
+				Point<3> x0y05z0 (0,0.5,0);
+				Point<3> shift_of_x0y05z0(0,0.1,0);
+				points_xyz[0] = x0y05z0;
+				shift_dxdydz[0] = shift_of_x0y05z0;
+
+				Point<3> x05y0z0 (0.5,0,0);
+				Point<3> shift_of_x05y0z0(0,-0.125,0);
+				points_xyz[1] = x05y0z0;
+				shift_dxdydz[1] = shift_of_x05y0z0;
+
+				Point<3> x05y05z0 (0.5,0.5,0);
+				Point<3> shift_of_x05y05z0 (0,-0.3,0);
+				points_xyz[2] = x05y05z0;
+				shift_dxdydz[2] = shift_of_x05y05z0;
+
+				Point<3> x1y05z0 (1,0.5,0);
+				Point<3> shift_of_x1y05z0(0,-0.2,0);
+				points_xyz[3] = x1y05z0;
+				shift_dxdydz[3] = shift_of_x1y05z0;
+
+				Point<3> x05y1z0 (0.5,1,0);
+				Point<3> shift_of_x05y1z0(0.15,0,0);
+				points_xyz[4] = x05y1z0;
+				shift_dxdydz[4] = shift_of_x05y1z0;
+
+				Point<3> x0y05z05 (0,0.5,0.5);
+				Point<3> shift_of_x0y05z05(0,0.2,0);
+				points_xyz[5] = x0y05z05;
+				shift_dxdydz[5] = shift_of_x0y05z05;
+
+				Point<3> x05y05z05 (0.5,0.5,0.5);
+				Point<3> shift_of_x05y05z05(0.1,-0.1,-0.15);
+				points_xyz[6] = x05y05z05;
+				shift_dxdydz[6] = shift_of_x05y05z05;
+
+				Point<3> x1y05z05 (1,0.5,0.5);
+				Point<3> shift_of_x1y05z05(0,0.1,-0.1);
+				points_xyz[7] = x1y05z05;
+				shift_dxdydz[7] = shift_of_x1y05z05;
+
+				Point<3> x0y1z05 (0,1,0.5);
+				Point<3> shift_of_x0y1z05(0,0,0.1);
+				points_xyz[8] = x0y1z05;
+				shift_dxdydz[8] = shift_of_x0y1z05;
+
+				Point<3> x05y1z05 (0.5,1,0.5);
+				Point<3> shift_of_x05y1z05(0.1,0,-0.05);
+				points_xyz[9] = x05y1z05;
+				shift_dxdydz[9] = shift_of_x05y1z05;
+
+				Point<3> x1y1z05 (1,1,0.5);
+				Point<3> shift_of_x1y1z05(0,0,0.2);
+				points_xyz[10] = x1y1z05;
+				shift_dxdydz[10] = shift_of_x1y1z05;
+
+				Point<3> x05y0z1 (0.5,0,1);
+				Point<3> shift_of_x05y0z1(-0.1,0,0);
+				points_xyz[11] = x05y0z1;
+				shift_dxdydz[11] = shift_of_x05y0z1;
+
 				Point<3> x0y05z1 (0,0.5,1);
 				Point<3> shift_of_x0y05z1(0,-0.125,0);
+				points_xyz[12] = x0y05z1;
+				shift_dxdydz[12] = shift_of_x0y05z1;
 
-				points_xyz[0] = x1y1z05;
-				points_xyz[1] = x0y05z1;
-				shift_dxdydz[0] = shift_of_x1y1z05;
-				shift_dxdydz[1] = shift_of_x0y05z1;
+				Point<3> x05y05z1 (0.5,0.5,1);
+				Point<3> shift_of_x05y05z1(0,-0.2,0);
+				points_xyz[13] = x05y05z1;
+				shift_dxdydz[13] = shift_of_x05y05z1;
+
+				Point<3> x1y05z1 (1,0.5,1);
+				Point<3> shift_of_x1y05z1(0,0.25,0);
+				points_xyz[14] = x1y05z1;
+				shift_dxdydz[14] = shift_of_x1y05z1;
+
+				Point<3> x05y1z1 (0.5,1,1);
+				Point<3> shift_of_x05y1z1(0.1,0,0);
+				points_xyz[15] = x05y1z1;
+				shift_dxdydz[15] = shift_of_x05y1z1;
 
 				shift_vertex_by_vector( triangulation, points_xyz, shift_dxdydz );
 			}
