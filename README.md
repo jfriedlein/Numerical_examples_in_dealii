@@ -53,9 +53,12 @@ Be aware that you can also choose the geometry of the notch (round, sharp), whic
 ### Bar
 
 ### One element test (also distorted) & Distorted 8 elements
-By setting the number of global refinements to zero, you obtain the one-element test. For number of global refinements equal to 1 (in 3D) you obtain 8 Elements arranged as a cube, which can also be distorted internally (overall still a cube, but distorted but matching elements inside).
+By setting the number of global refinements to zero, you obtain the one-element test.
+For number of global refinements equal to 1 (in 3D) you obtain 8 Elements arranged as a cube, which can also be distorted internally (overall still a cube, but distorted but matching elements inside).
+<img src="https://github.com/jfriedlein/Numerical_examples_in_dealii/blob/master/images/Dis8El.png" width="500">
 
 ### Tensile specimen SEP1230 (parameterised)
+<img src="https://github.com/jfriedlein/Numerical_examples_in_dealii/blob/master/images/tensileSpecimen_SEP1230.png" width="500">
 
 ### Three-point beam
 Bending of a notched beam
