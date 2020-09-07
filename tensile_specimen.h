@@ -778,6 +778,21 @@ namespace tensileSpecimen
 			triangulation.execute_coarsening_and_refinement();
 		 }
 
+		// Notch the parallel area in the middle
+		 // Find the nodes (plural because of thickness) at x=0 and shift them down by 0.5% of the hwidth_b
+		 if ( false/*notch the tensile specimen*/ )
+		 {
+			for (typename Triangulation<dim>::active_cell_iterator
+				 cell = triangulation.begin_active();
+				 cell != triangulation.end(); ++cell)
+			{
+					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+						if ( ( std::abs(cell->vertex(vertex)[enums::x]) < 5.*search_tolerance ) )
+							if (( std::abs(cell->vertex(vertex)[enums::y] - hwidth_b) < 5.*search_tolerance ) )
+							  cell->vertex(vertex)[enums::y] -= 0.03 * hwidth_b;
+			}
+		 }
+
 
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 //		{
