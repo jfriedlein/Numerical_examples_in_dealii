@@ -536,6 +536,21 @@ namespace tensileSpecimen
 		 SphericalManifold<dim> spherical_manifold_lower ( lower_radius_center);
 		 triangulation.set_manifold(parameters_internal.manifold_id_radius_lower, spherical_manifold_lower);
 
+		// Notch the parallel area in the middle
+		 // Find the nodes (plural because of thickness) at x=0 and shift them down by 0.5% of the hwidth_b
+		 if ( true/*notch the tensile specimen*/ )
+		 {
+			for (typename Triangulation<dim>::active_cell_iterator
+				 cell = triangulation.begin_active();
+				 cell != triangulation.end(); ++cell)
+			{
+					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+						if ( ( std::abs(cell->vertex(vertex)[enums::x]) < 5.*search_tolerance ) )
+							if (( std::abs(cell->vertex(vertex)[enums::y] - hwidth_b) < 5.*search_tolerance ) )
+							  cell->vertex(vertex)[enums::y] -= 0.03 * hwidth_b;
+			}
+		 }
+
 		// Global refinement
 		 triangulation.refine_global(parameter.nbr_global_refinements);
 
@@ -548,18 +563,17 @@ namespace tensileSpecimen
 			{
 				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
 					// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
-					if ( std::abs( cell->face(face)->center()[enums::x] ) <= ( length_parallel/2. + 1e3*search_tolerance ) )
+					if ( std::abs( cell->face(face)->center()[enums::x] ) <= ( length_parallel/(4.+3.*double(nbr_local_ref) ) ) )
 					{
-//						if ( nbr_local_ref==1 || nbr_local_ref==3 || nbr_local_ref==5 || nbr_local_ref==7 ) // even
+						if ( nbr_local_ref==1 || nbr_local_ref==3 || nbr_local_ref==5 || nbr_local_ref==7 ) // even
 							cell->set_refine_flag();
-//						else
-//							cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the x-direction
+						else
+							cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the x-direction
 						break;
 					}
 			}
 			triangulation.execute_coarsening_and_refinement();
 		 }
-
 
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 		/*
@@ -765,11 +779,11 @@ namespace tensileSpecimen
 			{
 				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
 					// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
-					if ( std::abs( cell->face(face)->center()[enums::x] ) <= ( length_parallel/2. + 1e3*search_tolerance ) )
+					if ( std::abs( cell->face(face)->center()[enums::x] ) <= 3. )//length_parallel/(4.+2.*double(nbr_local_ref)) )
 					{
 						// @todo Multiple local anisotropic refinements cause DII to fail, Why?
 //						if ( nbr_local_ref==1 || nbr_local_ref==3 || nbr_local_ref==5 || nbr_local_ref==7 ) // even
-							cell->set_refine_flag();//RefinementCase<dim>::cut_xy); // refine in x and y-direction
+							cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine in x and y-direction
 //						else
 //							cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the x-direction
 						break;
@@ -813,3 +827,4 @@ namespace tensileSpecimen
 		
 	}
 }
+
