@@ -187,6 +187,9 @@ namespace OneElement
 
 		const double width = 1; // unit cube
 
+        // USER PARAMETERS:
+        const bool twitch_Dis8El_cube = true;
+
 		GridGenerator::hyper_cube(triangulation);
 
 		//Clear boundary ID's
@@ -352,6 +355,19 @@ namespace OneElement
 				shift_dxdydz[15] = shift_of_x05y1z1;
 
 				shift_vertex_by_vector( triangulation, points_xyz, shift_dxdydz );
+
+				if ( twitch_Dis8El_cube /*to be twitched*/)
+				{
+					std::vector< Point<3> > point_xyz (1);
+					std::vector< Point<3> > shift_point (1);
+
+					Point<3> x1y1z1 (1,1,1);
+					Point<3> shift_of_x1y1z1(0.01,0,0);
+					point_xyz[0] = x1y1z1;
+					shift_point[0] = shift_of_x1y1z1;
+
+					shift_vertex_by_vector( triangulation, point_xyz, shift_point );
+				}
 			}
 		}
 
