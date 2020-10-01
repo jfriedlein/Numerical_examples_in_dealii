@@ -28,6 +28,9 @@ namespace BarModel
 	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus;
 	 const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_xPlus;
 
+	// Characteristic body dimensions
+	 std::vector<double> body_dimensions (5);
+
 	// Some internal parameters
 	 struct parameterCollection
 	 {
@@ -255,9 +258,9 @@ namespace BarModel
 				  }
 			}
 
-			if ( true/*only refine globally*/ )
-				triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
-			else // refine in a special manner only cells around the origin
+			triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
+
+			// refine in a special manner only cells around the origin
 			{
 				for ( unsigned int nbr_local_ref=0; nbr_local_ref<parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
 				{
@@ -266,10 +269,9 @@ namespace BarModel
 								 cell != triangulation.end(); ++cell)
 					{
 						for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-						  if (cell->face(face)->at_boundary())
 						  {
 							// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
-							if (std::abs(cell->face(face)->center()[1] ) < 1./(nbr_local_ref+1.))
+							if (std::abs(cell->face(face)->center()[enums::y] ) < height/8. )
 							{
 								cell->set_refine_flag();
 								break;
@@ -344,27 +346,103 @@ namespace BarModel
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
+		// USER PARAMETERS
+		const bool refinement_only_globally = false;
+		const bool damage_trigger_by_materialParameters = false;
+		const bool damage_trigger_by_notching = true;
+		const enums::enum_coord notched_face = enums::x;
+		const double refined_fraction = 1./parameter.grid_y_repetitions;
+
 		// ToDo: use the values from the parameter file
-		const double width = 1; // equals depth, square bottom area
-		const double height = 8;
+		const double width = parameter.width; // use thickness=width for square bottom area
+		const double thickness = parameter.thickness;
+		const double length = parameter.height;
+		const double notch_reduction = parameter.ratio_x;
+		// The notch length is set (for consistency) s.t. its mesh discretisation is exact for 1 local refinement (start)
+		 double notch_length = length/10.;//(2.*parameter.grid_y_repetitions);
 
-		// The points that span the brick
+		body_dimensions[enums::x] = width;
+		body_dimensions[enums::y] = length;
+		body_dimensions[enums::z] = thickness;
+
+		// The bar is created from two bricks, where the first will be meshed very fine
+		// and the second remains coarse. The bricks are spanned by three points.
 		 Point<dim> p1 (0,0,0);
-		 Point<dim> p2 (width, height, width); // extends in y-direction its height (loaded in y-direction as the othe models)
+		 Point<dim> p2 (width, length * refined_fraction, thickness); // extends in y-direction its height (loaded in y-direction as the othe models)
+		 Point<dim> p3 (0, length, 0); // extends in y-direction its height (loaded in y-direction as the othe models)
+		 Point<dim> p4 (width, length, thickness);
 
-		// vector containing the number of elements in each dimension
-		 std::vector<unsigned int> repetitions (3);
-		 repetitions[0]=1; // x
-		 repetitions[1]=parameter.grid_y_repetitions; // y
-		 repetitions[2]=1; // z
+		if ( /*use fine and coarse brick*/true )
+		{
+			// Vector containing the number of elements in each dimension
+			// The coarse segment consists of the set number of elements in the y-direction
+			 std::vector<unsigned int> repetitions (3);
+			 repetitions[enums::x] = 6 * (parameter.nbr_global_refinements+1);
+			 repetitions[enums::y] = parameter.grid_y_repetitions * (1 - refined_fraction) * (parameter.nbr_global_refinements+1); // y
+			 repetitions[enums::z] = parameter.nbr_elementsInZ;
 
-		GridGenerator::subdivided_hyper_rectangle
-				( 	triangulation,
-					repetitions,
-					p1,
-					p2 );
+			// The fine segment consists of at least 2 elements plus possible refinements
+			 std::vector<unsigned int> repetitions_fine (3);
+			 repetitions_fine[enums::x] = 6 * (parameter.nbr_global_refinements+1);
+			 repetitions_fine[enums::y] = (parameter.grid_y_repetitions * refined_fraction) * std::pow(2.,parameter.nbr_holeEdge_refinements) * (parameter.nbr_global_refinements+1); // y
+			 repetitions_fine[enums::z] = parameter.nbr_elementsInZ;
 
-		//Clear boundary ID's
+			Triangulation<3> triangulation_fine, triangulation_coarse;
+			// The fine brick
+			 GridGenerator::subdivided_hyper_rectangle ( triangulation_fine,
+														 repetitions_fine,
+														 p1,
+														 p2 );
+
+			// The coarse brick
+			 GridGenerator::subdivided_hyper_rectangle ( triangulation_coarse,
+														 repetitions,
+														 p2,
+														 p3 );
+
+			// Merging fine and coarse brick
+			// @note The interface between the two bricks needs to be meshed identically.
+			// deal.II cannot detect hanging nodes there.
+			GridGenerator::merge_triangulations( triangulation_fine,
+												 triangulation_coarse,
+												 triangulation,
+												 1e-9 * length );
+
+			// Local refinement
+			if ( parameter.nbr_holeEdge_refinements >= 0 && parameter.nbr_global_refinements==0 )
+			{
+				for (typename Triangulation<dim>::active_cell_iterator
+							 cell = triangulation.begin_active();
+							 cell != triangulation.end(); ++cell)
+				{
+					for ( unsigned int face=0; face < GeometryInfo<dim>::faces_per_cell; face++ )
+						if ( cell->center()[loading_direction] < length * refined_fraction )
+						{
+							cell->set_refine_flag();
+							break;
+						}
+				}
+				triangulation.execute_coarsening_and_refinement();
+			}
+		}
+		else // use uniform brick with xy refinements
+		{
+			 std::vector<unsigned int> repetitions (3);
+			 repetitions[enums::x] = std::pow(2.,parameter.nbr_holeEdge_refinements);
+			 repetitions[enums::y] = std::pow(2.,parameter.nbr_holeEdge_refinements); // y
+			 repetitions[enums::z] = parameter.nbr_elementsInZ;
+
+			 std::cout << "nbr of el " << std::pow(2.,parameter.nbr_holeEdge_refinements) << std::endl;
+
+			 GridGenerator::subdivided_hyper_rectangle ( triangulation,
+														 repetitions,
+														 p1,
+														 p4 );
+
+			 notch_length = length/8.;
+		}
+
+		// Clear boundary ID's
 		for (typename Triangulation<dim>::active_cell_iterator
 			 cell = triangulation.begin_active();
 			 cell != triangulation.end(); ++cell)
@@ -376,7 +454,7 @@ namespace BarModel
 			  }
 		}
 
-		//Set boundary IDs and and manifolds
+		// Set boundary IDs and and manifolds
 		const Point<dim> direction (0,0,1);
 		const Point<dim> centre (0,0,0);
 		for (typename Triangulation<dim>::active_cell_iterator
@@ -386,12 +464,12 @@ namespace BarModel
 			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
 			  if (cell->face(face)->at_boundary())
 			  {
-				//Set boundary IDs
+				// Set boundary IDs
 				if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
 				{
 					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 				}
-				else if (std::abs(cell->face(face)->center()[0] - width) < search_tolerance)
+				else if ( std::abs(cell->face(face)->center()[enums::x] - body_dimensions[enums::x] ) < search_tolerance)
 				{
 					cell->face(face)->set_boundary_id(enums::id_boundary_xPlus);
 				}
@@ -399,7 +477,7 @@ namespace BarModel
 				{
 					cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
 				}
-				else if (std::abs(cell->face(face)->center()[1] - height) < search_tolerance)
+				else if (std::abs(cell->face(face)->center()[1] - length) < search_tolerance)
 				{
 					cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
 				}
@@ -407,7 +485,7 @@ namespace BarModel
 				{
 					cell->face(face)->set_boundary_id(enums::id_boundary_zMinus);
 				}
-				else if (std::abs(cell->face(face)->center()[2] - width) < search_tolerance)
+				else if (std::abs(cell->face(face)->center()[2] - thickness) < search_tolerance)
 				{
 					cell->face(face)->set_boundary_id(enums::id_boundary_zPlus);
 				}
@@ -419,56 +497,89 @@ namespace BarModel
 			  }
 		}
 
-		if ( true/*only refine globally*/ )
-			triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
-		else // refine in a special manner only cells around the origin
+//		if ( refinement_only_globally )
+//			triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
+//		else // Refine in a special manner only cells around the origin
+//		{
+//			for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
+//			{
+//				for (typename Triangulation<dim>::active_cell_iterator
+//							 cell = triangulation.begin_active();
+//							 cell != triangulation.end(); ++cell)
+//				{
+//					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+//					{
+//						// Find all cells that lay in an exemplary damage band with size 1/4 from the y=0 face
+//						if ( cell->vertex(vertex)[enums::y] < length/4. )
+//						{
+//							cell->set_refine_flag();
+//							break;
+//						}
+//					}
+//				}
+//				triangulation.execute_coarsening_and_refinement();
+//			}
+//		}
+//
+//		// Mark the innermost cell(s) for softening to trigger the damage development
+//		if ( triangulation.n_active_cells()>1 && damage_trigger_by_materialParameters )
+//		{
+//			bool found_cell=false;
+//			for (typename Triangulation<dim>::active_cell_iterator
+//						 cell = triangulation.begin_active();
+//						 cell != triangulation.end(); ++cell)
+//			{
+//				for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+//				 // Find the cell that has one vertex at the origin
+////				  if ( (cell->vertex(vertex)).distance(centre)<1e-12 )
+//				 // Find cells that lay on the xz-plane (y=0)
+//				  if ( std::abs(cell->vertex(vertex)[enums::y]) < 1 ) // mark cells in the first millimeter as "to be softened"
+//				  {
+//					  cell->set_material_id(1);
+//					  found_cell = true;
+//					  break;
+//				  }
+//
+//				if ( /*only weaken one cell:*/ false  && found_cell )	// ToDo: check: does a break leave only the inner for-loop?
+//					break;
+//			}
+//
+//			AssertThrow(found_cell, ExcMessage("BarModel<< Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
+//		}
+
+		// Notch the specimen by moving some nodes inwards to form a notch
+		if ( triangulation.n_active_cells() > 1 && damage_trigger_by_notching )
 		{
-			for ( unsigned int nbr_local_ref=0; nbr_local_ref<parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
-			{
-				for (typename Triangulation<dim>::active_cell_iterator
-							 cell = triangulation.begin_active();
-							 cell != triangulation.end(); ++cell)
-				{
-					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-					  if (cell->face(face)->at_boundary())
-					  {
-						// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
-						if (std::abs(cell->face(face)->center()[loading_direction] ) < 1./(nbr_local_ref+1.))
-						{
-							cell->set_refine_flag();
-							break;
-						}
-					  }
-				}
-				triangulation.execute_coarsening_and_refinement();
-			}
-		}
-		
-		// Mark the innermost cell(s) for softening to trigger the damage development
-		if ( triangulation.n_active_cells()>1)
-		{
-			bool found_cell=false;
-			for (typename Triangulation<dim>::active_cell_iterator
+			// Declare the shift vector for the notching
+			 Point<3> notching; // initially zero
+			// Depending on the desired notching direction (notched_face),
+			// we set the according shift component to the overall reduction
+			 notching[notched_face] = - body_dimensions[notched_face] * ( 1.-notch_reduction );
+
+			// A quick assurance variable to assure that at least a single vertex has been found,
+			// so our search criterion where to look for the vertices is not completely off
+			 bool found_vertex=false;
+			// Looping over all cells to notch the to-be-notched cells
+			 for ( typename Triangulation<dim>::active_cell_iterator
 						 cell = triangulation.begin_active();
-						 cell != triangulation.end(); ++cell)
-			{
+						 cell != triangulation.end(); ++cell )
+			 {
 				for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
-				 // Find the cell that has one vertex at the origin
-//				  if ( (cell->vertex(vertex)).distance(centre)<1e-12 )
-				 // Find cells that lay on the xz-plane (y=0)
-				  if ( std::abs(cell->vertex(vertex)[1]) < 1 ) // vs 1e-12 used previously
-				  {
-					  cell->set_material_id(1);
-					  found_cell = true;
-					  break;
-				  }
+				 // Find vertices that are in the first 1/16 of the entire length
+				  if ( std::abs(cell->vertex(vertex)[loading_direction]) <  notch_length )
+					  if ( std::abs( cell->vertex(vertex)[notched_face] - body_dimensions[notched_face]) < search_tolerance )
+					  {
+						  // The found vertex is moved by the \a notching vector
+						  // The notching shall be linear, hence a vertex in the notch is fully notched and the farther you
+						  // move away from the notch the lower the notching gets (linearly).
+						   cell->vertex(vertex) += notching * ( notch_length - cell->vertex(vertex)[loading_direction] ) / notch_length;
+						  found_vertex = true;
+					  }
+			 }
 
-				if ( /*only weaken one cell:*/ false  && found_cell )	// ToDo: check: does a break leave only the inner for-loop?
-					break;
-			}
-
-			AssertThrow(found_cell, ExcMessage("BarModel<< Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
+			AssertThrow(found_vertex, ExcMessage("BarModel<< We weren't able to find at least a single vertex to be notched."));
 		}
+
 
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 		/*
