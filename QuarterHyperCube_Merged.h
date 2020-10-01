@@ -599,7 +599,9 @@ namespace QuarterHyperCube_Merged
 		*/
 	}
 
-
+/**
+ * 3D Plate with a hole: 1/8 model
+ */
 	template <int dim>
 	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
@@ -705,7 +707,7 @@ namespace QuarterHyperCube_Merged
 					}
 				}
 
-				//Set manifold IDs
+				// Set manifold IDs
 				for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
 				{
 					//Project the cell vertex to the XY plane and test the distance from the cylinder axis
@@ -722,7 +724,7 @@ namespace QuarterHyperCube_Merged
 		}
 
 
-		// pre-refinement of the damaged area (around y=0)
+		// Pre-refinement (local refinements) of the damaged area (around y=0)
 		for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
 		{
 			for (typename Triangulation<dim>::active_cell_iterator
@@ -731,14 +733,13 @@ namespace QuarterHyperCube_Merged
 			{
 				double distance2D = std::sqrt( cell->center()[0]*cell->center()[0] + cell->center()[1]*cell->center()[1] );
 
-				for ( unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; face++ )
-				{
-					if ( cell->center()[loading_direction] < 30 )
+				for ( unsigned int face=0; face < GeometryInfo<dim>::faces_per_cell; face++ )
+					if ( cell->center()[loading_direction] < ratio_width_To_holeRadius/3. )
 					{
-						cell->set_refine_flag();
+						// @note Anisotropic refinements (xy or y) would be ideal here, but don't seem to work in deal.II yet
+						 cell->set_refine_flag();
 						break;
 					}
-				}
 			}
 			triangulation.execute_coarsening_and_refinement();
 		}
