@@ -215,14 +215,14 @@ namespace PlateWithAHole
 	// to see the effects of the inputs (lengths, refinements, etc) consider using the output (.eps, etc) below
 	void make_2d_plate_with_hole( Triangulation<2> &tria_2d,
 										  const double half_length,
-										  const double half_width,
+										  //const double half_width,
 										  const double hole_radius,
-										  const double hole_division_fraction, const Parameter::GeneralParameters &parameter )
+										  //const double hole_division_fraction,
+										  const Parameter::GeneralParameters &parameter )
 	{
-		const double length = 2.0*half_length;
-		const double width =  2.0*half_width;
+		//const double width =  2.0*half_width;
 		const double hole_diameter = 2.0*hole_radius;
-		const double internal_width = hole_diameter + hole_division_fraction*(width - hole_diameter);
+		//const double internal_width = hole_diameter + hole_division_fraction*(width - hole_diameter);
 
 		Point<2> centre_2d(0,0);
 		const types::manifold_id  	polar_manifold_id = 0;
@@ -296,16 +296,17 @@ namespace PlateWithAHole
 		  double holeRadius = parameter.holeRadius;
 
 		  // size of the inner mesh (hypercube with hole) relative to size of the whole plate
-		  double ratio_x = parameter.ratio_x;
+		  //double ratio_x = parameter.ratio_x;
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
 		make_2d_plate_with_hole(
 											triangulation,
 											ratio_width_To_holeRadius,			// length
-											ratio_width_To_holeRadius * 1.0,	// width: *1.0 => square
+											//ratio_width_To_holeRadius * 1.0,	// width: *1.0 => square
 											holeRadius,	// hole radius = diameter/2
-										    ratio_x, parameter
+										    //ratio_x,
+											parameter
 										);
 
 		//Clear boundary ID's
@@ -494,7 +495,7 @@ namespace PlateWithAHole
 		 double holeRadius = parameter.holeRadius;
 
 		  // size of the inner mesh (hypercube with hole) relative to size of the whole plate
-		  double ratio_x = parameter.ratio_x;
+		  //double ratio_x = parameter.ratio_x;
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
@@ -502,9 +503,10 @@ namespace PlateWithAHole
 				make_2d_plate_with_hole (
 											tria_2d,
 											ratio_width_To_holeRadius,			// length
-											ratio_width_To_holeRadius * 1.0,	// width: *1.0 => square
+											//ratio_width_To_holeRadius * 1.0,	// width: *1.0 => square
 											holeRadius,	// hole radius = diameter/2
-											ratio_x, parameter //, parameters_internal
+											//ratio_x,
+											parameter
 										);
 
 		// only relevant for 3d grid:
