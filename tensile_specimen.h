@@ -192,7 +192,7 @@ namespace tensileSpecimen
 		 const double hwidth_B = parameter.width/2.;
 
 		// half thickness of the specimen
-		 const double hthickness = parameter.thickness/2.;
+		 //const double hthickness = parameter.thickness/2.;
 
 		// length of the parallel thinner sectin with width b
 		 const double length_parallel = parameter.height;
@@ -446,10 +446,10 @@ namespace tensileSpecimen
 
 		// half widths for the quarter model (split in y and z direction)
 		 const double hwidth_b = parameter.notchWidth/2.;
-		 const double hwidth_B = parameter.width/2.;
+		 //const double hwidth_B = parameter.width/2.;
 
 		// half thickness of the specimen
-		 const double hthickness = parameter.thickness/2.;
+		 //const double hthickness = parameter.thickness/2.;
 
 		// length of the parallel thinner sectin with width b
 		 const double length_parallel = parameter.height;
