@@ -731,10 +731,8 @@ namespace QuarterHyperCube_Merged
 						 cell = triangulation.begin_active();
 						 cell != triangulation.end(); ++cell)
 			{
-				double distance2D = std::sqrt( cell->center()[0]*cell->center()[0] + cell->center()[1]*cell->center()[1] );
-
 				for ( unsigned int face=0; face < GeometryInfo<dim>::faces_per_cell; face++ )
-					if ( cell->center()[loading_direction] < ratio_width_To_holeRadius/3. )
+					if ( cell->center()[loading_direction] < ratio_width_To_holeRadius/5. )
 					{
 						// @note Anisotropic refinements (xy or y) would be ideal here, but don't seem to work in deal.II yet
 						 cell->set_refine_flag();
@@ -744,6 +742,32 @@ namespace QuarterHyperCube_Merged
 			triangulation.execute_coarsening_and_refinement();
 		}
 
+		if ( parameter.refine_special==1 )
+		{
+			// Refine the cell(s) marked by tracked_QP \n
+			// Strategy: \ņ
+			// For 2 global refinements use 3 special refinements
+			// For 3 global refinements use 2 special refinement
+			// For 4 global refinements use 1 special refinement
+			// For everything else, don't refine in this special manner
+			for (unsigned int refine_counter=0; int(refine_counter) < std::max(0,int(5-parameter.nbr_global_refinements)); refine_counter++)
+			{
+				for (typename Triangulation<dim>::active_cell_iterator
+							 cell = triangulation.begin_active();
+							 cell != triangulation.end(); ++cell)
+				{
+					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+					 if (std::abs(cell->vertex(vertex)[enums::y] - 0) < search_tolerance)
+						//if (std::abs(cell->vertex(vertex)[enums::z] - 0) < search_tolerance)
+						  if (std::abs(cell->vertex(vertex)[enums::x] - parameter.holeRadius) < search_tolerance)
+						  {
+							  cell->set_refine_flag();
+							  break; // Leave this cell
+						  }
+				}
+				triangulation.execute_coarsening_and_refinement();
+			}
+		}
 
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 		/*
