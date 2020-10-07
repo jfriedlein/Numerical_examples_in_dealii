@@ -347,8 +347,8 @@ namespace BarModel
 		const double search_tolerance = parameters_internal.search_tolerance;
 
 		// USER PARAMETERS
-		const bool refinement_only_globally = false;
-		const bool damage_trigger_by_materialParameters = false;
+		//const bool refinement_only_globally = false;
+		//const bool damage_trigger_by_materialParameters = false;
 		const bool damage_trigger_by_notching = true;
 		const enums::enum_coord notched_face = enums::x;
 		const double refined_fraction = 1./parameter.grid_y_repetitions;
