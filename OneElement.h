@@ -249,7 +249,7 @@ namespace OneElement
 		triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
 		// Distortion
-		if ( /*distortion*/ true )
+		if ( /*distortion*/ false )
 		{
 			if ( triangulation.n_active_cells()==1 )
 			{
