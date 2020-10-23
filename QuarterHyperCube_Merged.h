@@ -564,7 +564,7 @@ namespace QuarterHyperCube_Merged
 			{
 				for ( unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; face++ )
 				{
-					if ( cell->center()[enums::y] < width/2. )
+					if ( cell->center()[enums::y] < width*0.75 )
 					{
 						cell->set_refine_flag();
 						break;
