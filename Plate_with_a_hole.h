@@ -228,7 +228,7 @@ namespace PlateWithAHole
 		const types::manifold_id  	polar_manifold_id = 0;
 		const types::manifold_id  	tfi_manifold_id = 1;
 
-		const double height2Width_ratio = 3.;
+		const double height2Width_ratio = 1.;
 
 		GridGenerator::plate_with_a_hole 	( 	tria_2d,
 												hole_radius,
@@ -377,7 +377,8 @@ namespace PlateWithAHole
 		static SphericalManifold<dim> spherical_manifold (centre);
 		triangulation.set_manifold(parameters_internal.manifold_id_hole,spherical_manifold);
 
-		// pre-refinement of the damaged area (around y=0)
+		// The following does not work?
+//		// pre-refinement of the damaged area (around y=0)
 //		for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
 //		{
 //			for (typename Triangulation<dim>::active_cell_iterator
@@ -414,29 +415,27 @@ namespace PlateWithAHole
 		{
 			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
 			{
-				// Set the INTERNAL (not at the boundary) face to the xminus id
-				// Find the cell face at x=0, containing the node (0,-hwidth,0) pointing in x-direction
-				if ( (std::abs(cell->face(face)->center()[enums::x] - 0.0) < search_tolerance) )
-				{
-					// @todo-optimize: We only look for single cell-face, so we could stop checking this, if we found something (e.g. bool found_xMinus)
-					if ( cell->face(face)->center()[enums::y] < 0 )
-					{
-						for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_face; ++vertex)
-						 {
+			  if (cell->face(face)->at_boundary() )
+			  {
+				  if ( ( cell->face(face)->center()[enums::y] + hwidth ) < search_tolerance ) // lower face
+				  {
+					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_face; ++vertex)
+					 {
 						 //Project the cell vertex to the XY plane and test the distance from the cylinder axis
 							Point<2> vertex_v = cell->face(face)->vertex(vertex);
 							Point<2> desired_mid_point (0,-hwidth);
 
 							if (std::abs(vertex_v.distance(desired_mid_point)) < search_tolerance)
 							{
+								std::cout << "found l at " << vertex_v << std::endl;
 								cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 								break;
 							}
-						}
-					}
+					 }
+				  }
 					// We also fix some face at the top of the plate to x=0, so it does not drift/shear sidewides
 					// @todo-ensure Do we create stress peaks by doing so?
-					else if ( cell->face(face)->center()[enums::y] > 0 )
+					else if ( ( cell->face(face)->center()[enums::y] - hwidth ) < search_tolerance ) // upper face
 					{
 						for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_face; ++vertex)
 						 {
@@ -446,13 +445,14 @@ namespace PlateWithAHole
 
 							if (std::abs(vertex_v.distance(desired_mid_point)) < search_tolerance)
 							{
+								std::cout << "found u at " << vertex_v << std::endl;
 								cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 								break;
 							}
 						}
 					}
 				}
-			}
+			  }
 		}
 
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
