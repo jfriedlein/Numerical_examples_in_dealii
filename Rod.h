@@ -29,6 +29,10 @@ namespace Rod
 	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus;
 	 //const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_xPlus;
 
+	// Here you can choose between a radial notch (smooth dent) and a sharp triangular notch (viewed in the cross section)
+	// USER parameter
+	 const bool radial_notch = false;
+
 	// Some internal parameters
 	 struct parameterCollection
 	 {
@@ -67,9 +71,6 @@ namespace Rod
 
 	double get_current_notch_radius( double &y_coord, const double &half_notch_length, const double &radius, const double &notch_radius, const double &R  )
 	{
-		// Here you can choose between a radial notch (smooth dent) and a sharp triangular notch (viewed in the cross section)
-		const bool radial_notch = true;
-
 		if ( radial_notch )
 			return R + notch_radius - std::sqrt( R*R - y_coord*y_coord );
 		else  /*linear notch*/
