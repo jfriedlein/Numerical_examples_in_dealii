@@ -188,17 +188,27 @@ namespace BarModel
 		template <int dim>
 		void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
 		{
+			// ToDo-assure: the use the values from the parameter file
+			const double width = parameter.width; // use thickness=width for square bottom area
+			const double length = parameter.height;
+
+			const bool damage_trigger_by_notching = true;
+			const enums::enum_coord notched_face = enums::x;
+			const double notch_reduction = parameter.ratio_x;
+			// The notch length is set (for consistency) s.t. its mesh discretisation is exact for 1 local refinement (start)
+			 double notch_length = length/10.;//(2.*parameter.grid_y_repetitions);
+
+			body_dimensions[enums::x] = width;
+			body_dimensions[enums::y] = length;
+
 			parameterCollection parameters_internal;
 
 			const double search_tolerance = parameters_internal.search_tolerance;
 
-			// ToDo: use the values from the parameter file
-			const double width = 1; // equals depth, square bottom area
-			const double height = 8;
 
 			// The points that span the brick
 			 Point<dim> p1 (0,0);
-			 Point<dim> p2 (width, height); // extends in y-direction its height (loaded in y-direction as the othe models)
+			 Point<dim> p2 (width, length); // extends in y-direction its length (loaded in y-direction as the other models)
 
 			// vector containing the number of elements in each dimension
 			 std::vector<unsigned int> repetitions (3);
@@ -246,7 +256,7 @@ namespace BarModel
 						cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
 //						cell->set_material_id( enums::tracked_QP );
 					}
-					else if (std::abs(cell->face(face)->center()[1] - height) < search_tolerance)
+					else if (std::abs(cell->face(face)->center()[1] - length) < search_tolerance)
 					{
 						cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
 					}
@@ -271,7 +281,7 @@ namespace BarModel
 						for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
 						  {
 							// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
-							if (std::abs(cell->face(face)->center()[enums::y] ) < height/8. )
+							if (std::abs(cell->face(face)->center()[enums::y] ) < length/8. )
 							{
 								cell->set_refine_flag();
 								break;
@@ -310,6 +320,61 @@ namespace BarModel
 				AssertThrow(found_cell, ExcMessage("BarModel<< Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
 			}
 
+
+			// Notch the specimen by moving some nodes inwards to form a notch
+			if ( damage_trigger_by_notching )
+			{
+//				Point<2> edge_point (1,0);
+//				Point<2> notching (-0.1,0);
+//				// A quick assurance variable to assure that at least a single vertex has been found,
+//				// so our search criterion where to look for the vertices is not completely off
+//				 bool found_vertex=false;
+//				// Looping over all cells to notch the to-be-notched cells
+//				 for ( typename Triangulation<dim>::active_cell_iterator
+//							 cell = triangulation.begin_active();
+//							 cell != triangulation.end(); ++cell )
+//				 {
+//					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+//					 // Find vertices that are in the first 1/16 of the entire length
+//					  if (cell->vertex(vertex).distance(edge_point) < search_tolerance )
+//					  {
+//						  // The found vertex is moved by the \a notching vector
+//						  // The notching shall be linear, hence a vertex in the notch is fully notched and the farther you
+//						  // move away from the notch the lower the notching gets (linearly).
+//						   cell->vertex(vertex) += notching;
+//						  found_vertex = true;
+//					  }
+//				 }
+
+				// Declare the shift vector for the notching
+				 Point<2> notching; // initially zero
+				// Depending on the desired notching direction (notched_face),
+				// we set the according shift component to the overall reduction
+				 notching[notched_face] = - body_dimensions[notched_face] * ( 1.-notch_reduction );
+
+				// A quick assurance variable to assure that at least a single vertex has been found,
+				// so our search criterion where to look for the vertices is not completely off
+				 bool found_vertex=false;
+				// Looping over all cells to notch the to-be-notched cells
+				 for ( typename Triangulation<dim>::active_cell_iterator
+							 cell = triangulation.begin_active();
+							 cell != triangulation.end(); ++cell )
+				 {
+					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+					 // Find vertices that are in the first 1/16 of the entire length
+					  if ( std::abs(cell->vertex(vertex)[loading_direction]) <  notch_length )
+						  if ( std::abs( cell->vertex(vertex)[notched_face] - body_dimensions[notched_face]) < search_tolerance )
+						  {
+							  // The found vertex is moved by the \a notching vector
+							  // The notching shall be linear, hence a vertex in the notch is fully notched and the farther you
+							  // move away from the notch the lower the notching gets (linearly).
+							   cell->vertex(vertex) += notching * ( notch_length - cell->vertex(vertex)[loading_direction] ) / notch_length;
+							  found_vertex = true;
+						  }
+				 }
+
+				AssertThrow(found_vertex, ExcMessage("BarModel<< We weren't able to find at least a single vertex to be notched."));
+			}
 
 			// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 			/*
