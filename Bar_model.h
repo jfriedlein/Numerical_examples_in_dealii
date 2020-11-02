@@ -497,8 +497,6 @@ namespace BarModel
 			 repetitions[enums::y] = std::pow(2.,parameter.nbr_holeEdge_refinements); // y
 			 repetitions[enums::z] = parameter.nbr_elementsInZ;
 
-			 std::cout << "nbr of el " << std::pow(2.,parameter.nbr_holeEdge_refinements) << std::endl;
-
 			 GridGenerator::subdivided_hyper_rectangle ( triangulation,
 														 repetitions,
 														 p1,
