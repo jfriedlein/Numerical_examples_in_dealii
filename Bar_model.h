@@ -243,7 +243,7 @@ namespace BarModel
 				  if (cell->face(face)->at_boundary())
 				  {
 					//Set boundary IDs
-					if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
+					if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance )//&& (false || cell->face(face)->center()[enums::y] < 0.5) ) // option: not symmetric in x
 					{
 						cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
 					}
