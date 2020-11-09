@@ -417,6 +417,8 @@ namespace BarModel
 		const bool damage_trigger_by_notching = true;
 		const enums::enum_coord notched_face = enums::x;
 		const double refined_fraction = 1./parameter.grid_y_repetitions;
+		const bool use_fine_and_coarse_brick = true;
+		const bool hardcoded_repetitions = false;
 
 		// ToDo: use the values from the parameter file
 		const double width = parameter.width; // use thickness=width for square bottom area
@@ -437,7 +439,7 @@ namespace BarModel
 		 Point<dim> p3 (0, length, 0); // extends in y-direction its height (loaded in y-direction as the othe models)
 		 Point<dim> p4 (width, length, thickness);
 
-		if ( /*use fine and coarse brick*/true )
+		if ( use_fine_and_coarse_brick )
 		{
 			// Vector containing the number of elements in each dimension
 			// The coarse segment consists of the set number of elements in the y-direction
@@ -493,9 +495,19 @@ namespace BarModel
 		else // use uniform brick with xy refinements
 		{
 			 std::vector<unsigned int> repetitions (3);
-			 repetitions[enums::x] = std::pow(2.,parameter.nbr_holeEdge_refinements);
-			 repetitions[enums::y] = std::pow(2.,parameter.nbr_holeEdge_refinements); // y
-			 repetitions[enums::z] = parameter.nbr_elementsInZ;
+
+			 if ( hardcoded_repetitions )
+			 {
+				 repetitions[enums::x] = 15;
+				 repetitions[enums::y] = 10;
+				 repetitions[enums::z] = 4;
+			 }
+			 else
+			 {
+				 repetitions[enums::x] = std::pow(2.,parameter.nbr_holeEdge_refinements);
+				 repetitions[enums::y] = std::pow(2.,parameter.nbr_holeEdge_refinements); // y
+				 repetitions[enums::z] = parameter.nbr_elementsInZ;
+			 }
 
 			 GridGenerator::subdivided_hyper_rectangle ( triangulation,
 														 repetitions,
