@@ -416,7 +416,9 @@ namespace BarModel
 		//const bool damage_trigger_by_materialParameters = false;
 		const bool damage_trigger_by_notching = true;
 		const enums::enum_coord notched_face = enums::x;
-		const double refined_fraction = 1./parameter.grid_y_repetitions;
+		// The refined fraction consists of \a nbr_coarse_in_fine_section coarse elements that make up the fine section
+		 const unsigned int nbr_coarse_in_fine_section = 2;
+		const double refined_fraction = double(nbr_coarse_in_fine_section)/parameter.grid_y_repetitions;
 		const bool use_fine_and_coarse_brick = true;
 		const bool hardcoded_repetitions = false;
 
