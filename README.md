@@ -53,7 +53,8 @@ Be aware that you can also choose the geometry of the notch (round, sharp), whic
 
 ### Quarter/Eight of a plate with hole
 
-### Bar
+### Bar or sheet strip
+For the bar or sheet strip (just a matter of the width) initial inhomogenous refinements are available. For finite plasticity, we recommend making the finer mesh part approximately a square to also capture the shear bands (develop for isotropy at 55°).
 
 ### One element test (also distorted) & Distorted 8 elements
 By setting the number of global refinements to zero, you obtain the one-element test.
