@@ -723,6 +723,9 @@ namespace QuarterHyperCube_Merged
 			  }
 		}
 
+		static SphericalManifold<dim> spherical_manifold (centre);
+		triangulation.set_manifold(parameters_internal.manifold_id_hole,spherical_manifold);
+
 
 		// Pre-refinement (local refinements) of the damaged area (around y=0)
 		for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
@@ -732,7 +735,7 @@ namespace QuarterHyperCube_Merged
 						 cell != triangulation.end(); ++cell)
 			{
 				for ( unsigned int face=0; face < GeometryInfo<dim>::faces_per_cell; face++ )
-					if ( cell->center()[loading_direction] < ratio_width_To_holeRadius/5. )
+					if ( cell->center()[loading_direction] < ratio_width_To_holeRadius/3. )
 					{
 						// @note Anisotropic refinements (xy or y) would be ideal here, but don't seem to work in deal.II yet
 						 cell->set_refine_flag();
