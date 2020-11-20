@@ -13,6 +13,21 @@
 
 using namespace dealii;
 
+// Append the \a enums namespace
+namespace enums
+{
+	/**
+	 * Clamping types
+	 */
+	 enum enum_clamping
+	 {
+		clamped_free = 0,   //!< clamped_free: left face is fixed in all directions, right face is unconstrained
+		clamped_sliding = 1,//!< clamped_sliding: left face is fixed in all directions, right face can slide in y-direction
+		clamped_clamped = 2 //!< clamped_clamped: @todo Not yet implemented
+	 };
+}
+
+
 namespace Beam
 /*
  * A beam along x with one symmetry constraint in z, loaded in y-direction
@@ -36,6 +51,9 @@ namespace Beam
 	 {
 		const double search_tolerance = 1e-12;
 	 };
+
+	// USER PARAMETER
+	 const unsigned int beam_type = enums::clamped_sliding;
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
@@ -193,6 +211,14 @@ namespace Beam
 															constraints,
 															fe.component_mask(y_displacement)
 														);
+				if ( beam_type==enums::clamped_sliding )
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																id_boundary_load,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(x_displacement)
+															);
 			}
 			else
 			{
@@ -203,6 +229,14 @@ namespace Beam
 															constraints,
 															fe.component_mask(y_displacement)
 														);
+				if ( beam_type==enums::clamped_sliding )
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																id_boundary_load,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(x_displacement)
+															);
 			}
 		}
 	}
@@ -212,85 +246,139 @@ namespace Beam
 		template <int dim>
 		void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
 		{
-//			// ToDo-assure: the use the values from the parameter file
-//			const double width = parameter.width; // use thickness=width for square bottom area
-//			const double length = parameter.height;
-//
-//			const bool damage_trigger_by_notching = true;
-//			const enums::enum_coord notched_face = enums::x;
-//			const double notch_reduction = parameter.ratio_x;
-//			// The notch length is set (for consistency) s.t. its mesh discretisation is exact for 1 local refinement (start)
-//			 double notch_length = length/10.;//(2.*parameter.grid_y_repetitions);
-//
-//			body_dimensions[enums::x] = width;
-//			body_dimensions[enums::y] = length;
-//
-//			parameterCollection parameters_internal;
-//
-//			const double search_tolerance = parameters_internal.search_tolerance;
-//
-//
-//			// The points that span the brick
-//			 Point<dim> p1 (0,0);
-//			 Point<dim> p2 (width, length); // extends in y-direction its length (loaded in y-direction as the other models)
-//
-//			// vector containing the number of elements in each dimension
-//			 std::vector<unsigned int> repetitions (3);
-//			 repetitions[0]=1; // x
-//			 repetitions[1]=parameter.grid_y_repetitions; // y
-//
-//			GridGenerator::subdivided_hyper_rectangle 	( 	triangulation,
-//															repetitions,
-//															p1,
-//															p2
-//														);
-//
+			parameterCollection parameters_internal;
+
+			const double search_tolerance = parameters_internal.search_tolerance;
+
+			// ToDo: use the values from the parameter file
+			const double width = parameter.width; // use thickness=width for square bottom area
+			const double thickness = parameter.thickness;
+			const double length = parameter.height;
+
+			// USER PARAMETERS
+			 double refined_fraction=length/4.;
+			 bool refinement_only_globally = false;
+
+			body_dimensions[enums::x] = length;
+			body_dimensions[enums::y] = width;
+			body_dimensions[enums::z] = thickness;
+
+			// The bar is created from two bricks, where the first will be meshed very fine
+			// and the second remains coarse. The bricks are spanned by three points.
+			 Point<dim> p1 (0,0);
+			 Point<dim> p2 (length * refined_fraction, width); // extends in y-direction its height (loaded in y-direction as the othe models)
+			 Point<dim> p3 (length, 0); // extends in y-direction its height (loaded in y-direction as the othe models)
+			 Point<dim> p4 (length, width);
+
+			 if ( /*use fine and coarse brick*/false )
+			{
+				// Vector containing the number of elements in each dimension
+				// The coarse segment consists of the set number of elements in the y-direction
+				 std::vector<unsigned int> repetitions (dim);
+				 repetitions[enums::x] = 6 * (parameter.nbr_global_refinements+1);
+				 repetitions[enums::y] = 3; // y
+
+				// The fine segment consists of at least 2 elements plus possible refinements
+				 std::vector<unsigned int> repetitions_fine (dim);
+				 repetitions_fine[enums::x] = 6 * (parameter.nbr_global_refinements+1);
+				 repetitions_fine[enums::y] = 3; // y
+
+				Triangulation<dim> triangulation_fine, triangulation_coarse;
+				// The fine brick
+				 GridGenerator::subdivided_hyper_rectangle ( triangulation_fine,
+															 repetitions_fine,
+															 p1,
+															 p2 );
+
+				// The coarse brick
+				 GridGenerator::subdivided_hyper_rectangle ( triangulation_coarse,
+															 repetitions,
+															 p2,
+															 p3 );
+
+				// Merging fine and coarse brick
+				// @note The interface between the two bricks needs to be meshed identically.
+				// deal.II cannot detect hanging nodes there.
+				GridGenerator::merge_triangulations( triangulation_fine,
+													 triangulation_coarse,
+													 triangulation,
+													 1e-9 * length );
+
+				// Local refinement
+				if ( parameter.nbr_holeEdge_refinements >= 0 && parameter.nbr_global_refinements==0 )
+				{
+					for (typename Triangulation<dim>::active_cell_iterator
+								 cell = triangulation.begin_active();
+								 cell != triangulation.end(); ++cell)
+					{
+						for ( unsigned int face=0; face < GeometryInfo<dim>::faces_per_cell; face++ )
+							if ( cell->center()[loading_direction] < length * refined_fraction )
+							{
+								cell->set_refine_flag();
+								break;
+							}
+					}
+					triangulation.execute_coarsening_and_refinement();
+				}
+			}
+			else // use uniform brick with xy refinements
+			{
+				 std::vector<unsigned int> repetitions (dim);
+				 repetitions[enums::x] = std::pow(2.,parameter.nbr_holeEdge_refinements);
+				 repetitions[enums::y] = std::pow(2.,parameter.nbr_holeEdge_refinements); // y
+
+				 GridGenerator::subdivided_hyper_rectangle ( triangulation,
+															 repetitions,
+															 p1,
+															 p4 );
+			}
+			//
 //			// ToDo-optimize: The following is similar for 2D and 3D, maybe merge it
-//			//Clear boundary ID's
-//			for (typename Triangulation<dim>::active_cell_iterator
-//				 cell = triangulation.begin_active();
-//				 cell != triangulation.end(); ++cell)
-//			{
-//				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-//				  if (cell->face(face)->at_boundary())
-//				  {
-//					  cell->face(face)->set_all_boundary_ids(0);
-//				  }
-//			}
-//
-//			//Set boundary IDs and and manifolds
-//			for (typename Triangulation<dim>::active_cell_iterator
-//				 cell = triangulation.begin_active();
-//				 cell != triangulation.end(); ++cell)
-//			{
-//				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-//				  if (cell->face(face)->at_boundary())
-//				  {
-//					//Set boundary IDs
-//					if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
-//					{
-//						cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
-//					}
-//					else if (std::abs(cell->face(face)->center()[0] - width) < search_tolerance)
-//					{
-//						cell->face(face)->set_boundary_id(enums::id_boundary_xPlus);
-//					}
-//					else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
-//					{
-//						cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
-////						cell->set_material_id( enums::tracked_QP );
-//					}
-//					else if (std::abs(cell->face(face)->center()[1] - length) < search_tolerance)
-//					{
-//						cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
-//					}
+			//Clear boundary ID's
+			for (typename Triangulation<dim>::active_cell_iterator
+				 cell = triangulation.begin_active();
+				 cell != triangulation.end(); ++cell)
+			{
+				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+				  if (cell->face(face)->at_boundary())
+				  {
+					  cell->face(face)->set_all_boundary_ids(0);
+				  }
+			}
+
+			//Set boundary IDs and and manifolds
+			for (typename Triangulation<dim>::active_cell_iterator
+				 cell = triangulation.begin_active();
+				 cell != triangulation.end(); ++cell)
+			{
+				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+				  if (cell->face(face)->at_boundary())
+				  {
+					//Set boundary IDs
+					if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
+					{
+						cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
+					}
+					else if (std::abs(cell->face(face)->center()[enums::x] - body_dimensions[enums::x]) < search_tolerance)
+					{
+						cell->face(face)->set_boundary_id(enums::id_boundary_xPlus);
+					}
+					else if (std::abs(cell->face(face)->center()[1] - 0.0) < search_tolerance)
+					{
+						cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
+//						cell->set_material_id( enums::tracked_QP );
+					}
+					else if (std::abs(cell->face(face)->center()[enums::y] - body_dimensions[enums::y]) < search_tolerance)
+					{
+						cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
+					}
 //					else
 //					{
 //						// There are just eight faces, so if we missed one, something went clearly terribly wrong
 //						 AssertThrow(false, ExcMessage("Beam - make_grid 2D<< Found an unidentified face at the boundary. Maybe it slipt through the assignment or that face is simply not needed. So either check the implementation or comment this line in the code"));
 //					}
-//				  }
-//			}
+				  }
+			}
 //
 //			triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 //
