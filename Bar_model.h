@@ -35,7 +35,20 @@ namespace BarModel
 	 struct parameterCollection
 	 {
 		const double search_tolerance = 1e-12;
+
+		const types::manifold_id manifold_id_right_radius = 11;
+		const types::manifold_id manifold_id_left_radius = 10;
 	 };
+
+	// USER PARAMETERS
+	 const bool constrain_sideways_sliding_of_loaded_face = false;
+
+	// Loading type and required modifications
+	// @note "compression": \n
+	// We use different boundary conditions and notch the body in the middle of its length and not a y=0.
+	// @note "tension" or "standard": \n
+	// We model 1/8 of the entire body and notch the body at y=0 (equals the middle of the entire body).
+	 const enums::enum_loading_type loading_type = enums::compression;
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
@@ -63,82 +76,104 @@ namespace BarModel
 		const FEValuesExtractors::Scalar y_displacement(1);
 
 		// on X0 plane
-		if (apply_dirichlet_bc == true )
+		if ( loading_type==enums::compression )
 		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
+			// For compression we cannot apply a symmetry constraint on the X0 plane
 		}
-		else	// in the exact same manner
+		else
 		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-		}
-
-		// on Y0 edge
-		if (apply_dirichlet_bc == true )
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_yMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-		}
-		else	// in the exact same manner
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_yMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-		}
-
-		// on Z0 plane
-		if ( dim==3 )
-		{
-			const FEValuesExtractors::Scalar z_displacement(2);
-
 			if (apply_dirichlet_bc == true )
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															enums::id_boundary_zMinus,
+															enums::id_boundary_xMinus,
 															ZeroFunction<dim> (n_components),
 															constraints,
-															fe.component_mask(z_displacement)
+															fe.component_mask(x_displacement)
 														);
 			}
 			else	// in the exact same manner
 			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
-															enums::id_boundary_zMinus,
+															enums::id_boundary_xMinus,
 															ZeroFunction<dim> (n_components),
 															constraints,
-															fe.component_mask(z_displacement)
+															fe.component_mask(x_displacement)
 														);
 			}
+			}
 
-			if ( false/*apply sym BC on positive z-face also*/ )
+		// on Y0 edge
+		if ( loading_type==enums::compression )
+		{
+			// For compression we fix/clamp the Y0 plane, so it does not run away
+			FEValuesExtractors::Vector displacements(0);
+			ComponentMask disp_mask = fe.component_mask (displacements);
+			if (apply_dirichlet_bc == true )
 			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															enums::id_boundary_yMinus,
+															ZeroFunction<dim> (n_components),
+															constraints,
+															disp_mask // all disp components (not the global damage)
+														);
+			}
+			else	// in the exact same manner
+			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															enums::id_boundary_yMinus,
+															ZeroFunction<dim> (n_components),
+															constraints,
+															disp_mask // all disp components (not the global damage)
+														);
+			}
+		}
+		else
+		{
+			if (apply_dirichlet_bc == true )
+			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															enums::id_boundary_yMinus,
+															ZeroFunction<dim> (n_components),
+															constraints,
+															fe.component_mask(y_displacement)
+														);
+			}
+			else	// in the exact same manner
+			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															enums::id_boundary_yMinus,
+															ZeroFunction<dim> (n_components),
+															constraints,
+															fe.component_mask(y_displacement)
+														);
+			}
+		}
+
+		// on Z0 plane
+		if ( loading_type==enums::compression )
+		{
+			// for compression we don't fix anything in the third direction, because y0 was already clamped.
+			// @todo However, what about the upper part?
+			if ( dim==3 )
+				AssertThrow(false, ExcMessage("Bar_model<< Compression of bar yet untested for 3D. Take care of the z-boundary conditions."));
+		}
+		else
+		{
+			if ( dim==3 )
+			{
+				const FEValuesExtractors::Scalar z_displacement(2);
+
 				if (apply_dirichlet_bc == true )
 				{
 					VectorTools::interpolate_boundary_values(
 																dof_handler_ref,
-																enums::id_boundary_zPlus,
+																enums::id_boundary_zMinus,
 																ZeroFunction<dim> (n_components),
 																constraints,
 																fe.component_mask(z_displacement)
@@ -148,11 +183,35 @@ namespace BarModel
 				{
 					VectorTools::interpolate_boundary_values(
 																dof_handler_ref,
-																enums::id_boundary_zPlus,
+																enums::id_boundary_zMinus,
 																ZeroFunction<dim> (n_components),
 																constraints,
 																fe.component_mask(z_displacement)
 															);
+				}
+
+				if ( false/*apply sym BC on positive z-face also*/ )
+				{
+					if (apply_dirichlet_bc == true )
+					{
+						VectorTools::interpolate_boundary_values(
+																	dof_handler_ref,
+																	enums::id_boundary_zPlus,
+																	ZeroFunction<dim> (n_components),
+																	constraints,
+																	fe.component_mask(z_displacement)
+																);
+					}
+					else	// in the exact same manner
+					{
+						VectorTools::interpolate_boundary_values(
+																	dof_handler_ref,
+																	enums::id_boundary_zPlus,
+																	ZeroFunction<dim> (n_components),
+																	constraints,
+																	fe.component_mask(z_displacement)
+																);
+					}
 				}
 			}
 		}
@@ -169,6 +228,14 @@ namespace BarModel
 															constraints,
 															fe.component_mask(y_displacement)
 														);
+				if ( constrain_sideways_sliding_of_loaded_face )
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																id_boundary_load,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(x_displacement)
+															);
 			}
 			else
 			{
@@ -179,6 +246,14 @@ namespace BarModel
 															constraints,
 															fe.component_mask(y_displacement)
 														);
+				if ( constrain_sideways_sliding_of_loaded_face )
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																id_boundary_load,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(x_displacement)
+															);
 			}
 		}
 	}
@@ -196,7 +271,9 @@ namespace BarModel
 			const enums::enum_coord notched_face = enums::x;
 			const double notch_reduction = parameter.ratio_x;
 			// The notch length is set (for consistency) s.t. its mesh discretisation is exact for 1 local refinement (start)
-			 double notch_length = length/10.;//(2.*parameter.grid_y_repetitions);
+			 double notch_length = parameter.notchWidth;//length/10.;//(2.*parameter.grid_y_repetitions);
+
+			 const bool notch_rounded = true;
 
 			body_dimensions[enums::x] = width;
 			body_dimensions[enums::y] = length;
@@ -268,27 +345,159 @@ namespace BarModel
 				  }
 			}
 
-			triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
+			if ( notch_rounded/*use round notch*/ && loading_type == enums::compression )
+				triangulation.refine_global(2);	// ... Parameter.prm file
+			else
+				triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
-			// refine in a special manner only cells around the origin
+			// @warning When implementing the compression example we moved the notching in front of the local refinements.
+			// @todo Does that do something?
+			// Notch the specimen by moving some nodes inwards to form a notch
+			if ( damage_trigger_by_notching )
 			{
-				for ( unsigned int nbr_local_ref=0; nbr_local_ref<parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
-				{
-					for (typename Triangulation<dim>::active_cell_iterator
-								 cell = triangulation.begin_active();
-								 cell != triangulation.end(); ++cell)
-					{
-						for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+				// Declare the shift vector for the notching
+				 Point<2> notching; // initially zero
+				// Depending on the desired notching direction (notched_face),
+				// we set the according shift component to the overall reduction
+				 notching[notched_face] = - body_dimensions[notched_face] * ( 1.-notch_reduction );
+
+				// A quick assurance variable to assure that at least a single vertex has been found,
+				// so our search criterion where to look for the vertices is not completely off
+				 bool found_vertex=false;
+				 double notch_location = ( (loading_type==enums::compression) ? ((length-width)/2.+width) : 0. );
+
+				// Looping over all cells to notch the to-be-notched cells
+				 for ( typename Triangulation<dim>::active_cell_iterator
+							 cell = triangulation.begin_active();
+							 cell != triangulation.end(); ++cell )
+				 {
+					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+					 // Find vertices that are in the first 1/16 of the entire length
+					  if ( std::abs(cell->vertex(vertex)[loading_direction]-notch_location) <=  notch_length )
+						  if ( std::abs( cell->vertex(vertex)[notched_face] - body_dimensions[notched_face]) < search_tolerance )
 						  {
-							// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
-							if (std::abs(cell->face(face)->center()[enums::y] ) < length/8. )
-							{
-								cell->set_refine_flag();
-								break;
-							}
+							  // The found vertex is moved by the \a notching vector
+							  // The notching shall be linear, hence a vertex in the notch is fully notched and the farther you
+							  // move away from the notch the lower the notching gets (linearly).
+							   cell->vertex(vertex) += notching * ( notch_length - std::abs(cell->vertex(vertex)[loading_direction]-notch_location) ) / notch_length;
+							  found_vertex = true;
 						  }
+				 }
+
+				AssertThrow(found_vertex, ExcMessage("BarModel<< We weren't able to find at least a single vertex to be notched."));
+
+				// For compression we also notch the left edge
+				if ( loading_type == enums::compression )
+				{
+					notch_location = (length-width)/2.;
+
+					// A quick assurance variable to assure that at least a single vertex has been found,
+					// so our search criterion where to look for the vertices is not completely off
+					 found_vertex=false;
+
+					// Looping over all cells to notch the to-be-notched cells
+					 for ( typename Triangulation<dim>::active_cell_iterator
+								 cell = triangulation.begin_active();
+								 cell != triangulation.end(); ++cell )
+					 {
+						for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+						 // Find vertices that are in the first 1/16 of the entire length
+						  if ( std::abs(cell->vertex(vertex)[loading_direction]-notch_location) <=  notch_length )
+							  if ( std::abs( cell->vertex(vertex)[notched_face] - 0.) < search_tolerance )
+							  {
+								  // The found vertex is moved by the \a notching vector
+								  // The notching shall be linear, hence a vertex in the notch is fully notched and the farther you
+								  // move away from the notch the lower the notching gets (linearly).
+								   cell->vertex(vertex) -= notching * ( notch_length - std::abs(cell->vertex(vertex)[loading_direction]-notch_location) ) / notch_length;
+								  found_vertex = true;
+							  }
+					 }
+
+					AssertThrow(found_vertex, ExcMessage("BarModel<< We weren't able to find at least a single vertex to be notched."));
+				}
+			}
+
+			// Apply the manifolds
+			if ( notch_rounded/*use round notch*/ && loading_type == enums::compression )
+			{
+				// Find the inclined faces
+				for (typename Triangulation<dim>::active_cell_iterator
+							 cell = triangulation.begin_active();
+							 cell != triangulation.end(); ++cell)
+				{
+					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+				    {
+						Point<dim> face_center = cell->face(face)->center();
+						if ( face_center[enums::x] > width/100. && face_center[enums::x] < (width/8.-width/100.) )
+							cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_left_radius);
+						else if ( face_center[enums::x] < (width*99./100.) && face_center[enums::x] > (width*7./8.+width/100.) )
+							cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_right_radius);
+				    }
+				}
+
+				const double actual_notch_hlength = 1.25;
+				const double indent = body_dimensions[notched_face] * ( 1.-notch_reduction );
+				const double offset_of_center_from_face = (actual_notch_hlength*actual_notch_hlength - indent*indent)/(2.*indent);
+
+				// For the left radius
+				 Point<dim> centre_left_radius (-offset_of_center_from_face, (length-width)/2.);
+				 static SphericalManifold<dim> spherical_manifold_left (centre_left_radius);
+				 triangulation.set_manifold(parameters_internal.manifold_id_left_radius,spherical_manifold_left);
+
+				// For the right radius
+				 Point<dim> centre_right_radius (width+offset_of_center_from_face, (length-width)/2.+width );
+				 static SphericalManifold<dim> spherical_manifold_right (centre_right_radius);
+				 triangulation.set_manifold(parameters_internal.manifold_id_right_radius,spherical_manifold_right);
+
+				triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
+			}
+
+			// Refine in a special manner locally, if the number of local refinements is >0
+			if ( parameter.nbr_holeEdge_refinements > 0 )
+			{
+				if ( loading_type == enums::compression )
+				{
+					for ( unsigned int nbr_local_ref=0; nbr_local_ref<parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
+					{
+						for (typename Triangulation<dim>::active_cell_iterator
+									 cell = triangulation.begin_active();
+									 cell != triangulation.end(); ++cell)
+						{
+							for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+							  {
+								Point<dim> face_center = cell->face(face)->center();
+								// Find all cells that lay in an exemplary damage band with size 2xnotch_length along the diagonal
+								if (    face_center[enums::y] < ((length-width)/2. + notch_length + face_center[enums::x])
+									 && face_center[enums::y] > ((length-width)/2. - notch_length + face_center[enums::x]) )
+								{
+									cell->set_refine_flag();
+									break;
+								}
+							  }
+						}
+						triangulation.execute_coarsening_and_refinement();
 					}
-					triangulation.execute_coarsening_and_refinement();
+				}
+				else
+				{
+					for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
+					{
+						for (typename Triangulation<dim>::active_cell_iterator
+									 cell = triangulation.begin_active();
+									 cell != triangulation.end(); ++cell)
+						{
+							for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+							  {
+								// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
+								if (std::abs(cell->face(face)->center()[enums::y] ) < length/5. )
+								{
+									cell->set_refine_flag();
+									break;
+								}
+							  }
+						}
+						triangulation.execute_coarsening_and_refinement();
+					}
 				}
 			}
 
@@ -320,61 +529,6 @@ namespace BarModel
 				AssertThrow(found_cell, ExcMessage("BarModel<< Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
 			}
 
-
-			// Notch the specimen by moving some nodes inwards to form a notch
-			if ( damage_trigger_by_notching )
-			{
-//				Point<2> edge_point (1,0);
-//				Point<2> notching (-0.1,0);
-//				// A quick assurance variable to assure that at least a single vertex has been found,
-//				// so our search criterion where to look for the vertices is not completely off
-//				 bool found_vertex=false;
-//				// Looping over all cells to notch the to-be-notched cells
-//				 for ( typename Triangulation<dim>::active_cell_iterator
-//							 cell = triangulation.begin_active();
-//							 cell != triangulation.end(); ++cell )
-//				 {
-//					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
-//					 // Find vertices that are in the first 1/16 of the entire length
-//					  if (cell->vertex(vertex).distance(edge_point) < search_tolerance )
-//					  {
-//						  // The found vertex is moved by the \a notching vector
-//						  // The notching shall be linear, hence a vertex in the notch is fully notched and the farther you
-//						  // move away from the notch the lower the notching gets (linearly).
-//						   cell->vertex(vertex) += notching;
-//						  found_vertex = true;
-//					  }
-//				 }
-
-				// Declare the shift vector for the notching
-				 Point<2> notching; // initially zero
-				// Depending on the desired notching direction (notched_face),
-				// we set the according shift component to the overall reduction
-				 notching[notched_face] = - body_dimensions[notched_face] * ( 1.-notch_reduction );
-
-				// A quick assurance variable to assure that at least a single vertex has been found,
-				// so our search criterion where to look for the vertices is not completely off
-				 bool found_vertex=false;
-				// Looping over all cells to notch the to-be-notched cells
-				 for ( typename Triangulation<dim>::active_cell_iterator
-							 cell = triangulation.begin_active();
-							 cell != triangulation.end(); ++cell )
-				 {
-					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
-					 // Find vertices that are in the first 1/16 of the entire length
-					  if ( std::abs(cell->vertex(vertex)[loading_direction]) <  notch_length )
-						  if ( std::abs( cell->vertex(vertex)[notched_face] - body_dimensions[notched_face]) < search_tolerance )
-						  {
-							  // The found vertex is moved by the \a notching vector
-							  // The notching shall be linear, hence a vertex in the notch is fully notched and the farther you
-							  // move away from the notch the lower the notching gets (linearly).
-							   cell->vertex(vertex) += notching * ( notch_length - cell->vertex(vertex)[loading_direction] ) / notch_length;
-							  found_vertex = true;
-						  }
-				 }
-
-				AssertThrow(found_vertex, ExcMessage("BarModel<< We weren't able to find at least a single vertex to be notched."));
-			}
 
 			// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 			/*
