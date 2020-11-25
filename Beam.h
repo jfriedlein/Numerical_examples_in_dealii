@@ -18,6 +18,7 @@ namespace enums
 {
 	/**
 	 * Clamping types
+	 * @todo Add "beam" to names "enum_beam_clamping" and "beam_clamped_free" etc.
 	 */
 	 enum enum_clamping
 	 {
