@@ -68,8 +68,13 @@ It's parameterised so you can also change the geometry.
 
 <img src="https://github.com/jfriedlein/Numerical_examples_in_dealii/blob/master/images/tensileSpecimen_SEP1230.png" width="500">
 
+### SphereRigid-cube_contact: Pushing a rigid sphere into a cube in 2D
+For this example to work you require the assemble routines for contact that are NOT yet available online.
+
 ### Three-point beam
 Bending of a notched beam
 
 !!! Not developed anymore, version frozen in March 2020 !!!
+
+
 
