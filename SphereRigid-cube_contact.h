@@ -70,9 +70,9 @@ namespace SphereRigid_Cube
 	// @note We cannot add contact faces that point away from the punch and are on the other side of the body
 	 // @todo add "dim" instead of "2"
 	// Punch
-	 Point<2> punch_center = Point<2>(0.0,2.0);
+	 Point<2> punch_center = Point<2>(0.0,2.04);
 	 const Point<2> punch_loading_vector = Point<2>(0.,-1.);
-	 const double punch_radius = 0.98;
+	 const double punch_radius = 1.;
 	 std::shared_ptr<SphereRigid<2>> rigid_punch = std::shared_ptr<SphereRigid<2>>(new SphereRigid<2>( {punch_center,punch_loading_vector,punch_loading_vector} , {punch_radius} ));
 //	 Point<2> punch_center = Point<2>(0.0,1.01);
 //	 const Point<2> punch_loading_vector = Point<2>(0.,-1.);
