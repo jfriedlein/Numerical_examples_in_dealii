@@ -52,7 +52,6 @@ namespace SphereRigid_Cube
 	// The loaded faces:
 	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus;
 	 const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_none;
-	 const enums::enum_boundary_ids id_contact = enums::id_boundary_yPlus;
 
 	// Characteristic body dimensions
 	 std::vector<double> body_dimensions (5);
@@ -102,12 +101,6 @@ namespace SphereRigid_Cube
 		 * current_load_increment
 		 */
 
-		// Symmetry constraints:
-		// Update and apply new constraints
-		//		on x0_plane for symmetry (displacement_in_x = 0)
-		//		on y0_plane for symmetry (displacement_in_y = 0)
-		//		on z0_plane for symmetry (displacement_in_z = 0)
-
 		parameterCollection parameters_internal;
 
 		const FEValuesExtractors::Vector displacement(0);
@@ -137,6 +130,7 @@ namespace SphereRigid_Cube
 													);
 		}
 
+		// Apply the load
 		if (apply_dirichlet_bc == true )
 		{
 			if ( loading_type==enums::loading_prescribed )
@@ -150,14 +144,7 @@ namespace SphereRigid_Cube
 			else if ( loading_type==enums::loading_by_contact )
 				rigid_punch->move(current_load_increment);
 
-			if ( beam_type==enums::SRC_clamped_sliding )
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_xMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(x_displacement)
-														);
+
 		}
 		else
 		{
@@ -169,7 +156,14 @@ namespace SphereRigid_Cube
 															constraints,
 															fe.component_mask(y_displacement)
 														);
-			if ( beam_type==enums::SRC_clamped_sliding )
+
+		}
+
+		// Constraint on "free" end
+		if ( beam_type==enums::SRC_clamped_sliding )
+		{
+			if (apply_dirichlet_bc == true )
+			{
 				VectorTools::interpolate_boundary_values(
 															dof_handler_ref,
 															enums::id_boundary_xMinus,
@@ -177,13 +171,24 @@ namespace SphereRigid_Cube
 															constraints,
 															fe.component_mask(x_displacement)
 														);
+			}
+			else
+			{
+				VectorTools::interpolate_boundary_values(
+															dof_handler_ref,
+															enums::id_boundary_xMinus,
+															ZeroFunction<dim> (n_components),
+															constraints,
+															fe.component_mask(x_displacement)
+														);
+			}
 		}
 	}
 
 
 	// 2D grid
 		template <int dim>
-		void make_grid( Triangulation<2> &triangulation )
+		void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
 		{
 			//create a vector of begin and end positions of the blocks
 			std::vector<double> x_position{0.,2.};
@@ -198,7 +203,8 @@ namespace SphereRigid_Cube
 			Point<dim> p2 (x_position[1],y_position[1]);
 
 			//GridGenerator::subdivided_hyper_rectangle( triangulation, {1*parameter.nbr_global_refinements,4*parameter.nbr_global_refinements}, p1, p2 );
-			GridGenerator::subdivided_hyper_rectangle( triangulation, {12*2,12}, p1, p2 );
+			const unsigned int n_elements_per_dimension = std::pow( 2, parameter.nbr_global_refinements );
+			GridGenerator::subdivided_hyper_rectangle( triangulation, {2*n_elements_per_dimension,1*n_elements_per_dimension}, p1, p2 );
 
 			// Add the punch as a dummy body
 			// That is a bad way of doing it, because we add many dofs, we loop over in the assembly (expensive, useless)
@@ -274,7 +280,6 @@ namespace SphereRigid_Cube
 
 //
 //			// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-//			/*
 //			{
 //				std::ofstream out ("grid-2d_quarter_plate_merged.eps");
 //				GridOut grid_out;
@@ -295,7 +300,6 @@ namespace SphereRigid_Cube
 //				grid_out.write_ucd(triangulation, out_ucd);
 //				std::cout<<"Mesh written to Grid-2d_quarter_plate_merged.inp "<<std::endl;
 //			}
-//			*/
 		}
 
 
@@ -374,7 +378,7 @@ namespace SphereRigid_Cube
 		assemble_contact(
 							cell,
 							rigid_punch,
-							SphereRigid_Cube::id_contact,
+							enums::id_boundary_yPlus,
 							penalty_stiffness,
 							fe,
 							fe_face_values_ref,
