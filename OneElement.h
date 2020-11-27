@@ -9,6 +9,9 @@
 #include <fstream>
 #include <cmath>
 
+#include "../contact-rigidBody-dealii/contact-bodies.cc"
+#include "../contact-rigidBody-dealii/contact-rigid.cc"
+
 using namespace dealii;
 
 namespace OneElement
@@ -16,7 +19,7 @@ namespace OneElement
  * A single element with three symmetry constraints, loaded in y-direction, dimensions 1x1x1
  * By selecting 1 global refinement we can create the distorted 8 element test
  *
- * CERTIFIED TO STANDARD numExS07 (200724)
+ * STILL UNCERTIFIED ( since introduction of contact, requires update of standard to incorporate contact numEx)
  */
 {
 	// The loading direction: \n
@@ -33,6 +36,10 @@ namespace OneElement
 		const double search_tolerance = 1e-12;
 	 };
 
+	// Wall
+	 Point<2> wall_point_on_plane = Point<2>(0.0,1.00);
+	 const Point<2> wall_normal_unit_vector = Point<2>(0,-1.0);
+	 std::shared_ptr<WallRigid<2>> rigid_wall = std::shared_ptr<WallRigid<2>>(new WallRigid<2>( {wall_point_on_plane,wall_normal_unit_vector,wall_normal_unit_vector} , {} ));
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
@@ -128,7 +135,7 @@ namespace OneElement
 			}
 		}
 
-		if ( parameter.driver == 2/*Dirichlet*/ ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
+		if ( parameter.driver == enums::Dirichlet ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
 		{
 			// on top edge
 			if (apply_dirichlet_bc == true )
@@ -151,6 +158,11 @@ namespace OneElement
 															fe.component_mask(y_displacement)
 														);
 			}
+		}
+		else if ( parameter.driver == enums::Contact )
+		{
+			if (apply_dirichlet_bc == true )
+				rigid_wall->move(current_load_increment);
 		}
 	}
 
@@ -470,6 +482,14 @@ namespace OneElement
 			  }
 		}
 
+		// Distort
+//		for (typename Triangulation<dim>::active_cell_iterator
+//					 cell = triangulation.begin_active();
+//					 cell != triangulation.end(); ++cell)
+//		{
+//			cell->vertex(3)[enums::y] -= 0.05;
+//		}
+
 		triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
 		if ( triangulation.n_active_cells()>1)
@@ -495,22 +515,52 @@ namespace OneElement
 		}
 
 
-		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-		/*
-		{
-			std::ofstream out ("grid-3d_quarter_plate_merged.eps");
-			GridOut grid_out;
-			grid_out.write_eps (triangulation, out);
-			std::cout << "Grid written to grid-3d_quarter_plate_merged.eps" << std::endl;
-		}
-		{
-			std::ofstream out_ucd("Grid-3d_quarter_plate_merged.inp");
-			GridOut grid_out;
-			GridOutFlags::Ucd ucd_flags(true,true,true);
-			grid_out.set_flags(ucd_flags);
-			grid_out.write_ucd(triangulation, out_ucd);
-			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
-		}
-		*/
+		// Include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
+//		{
+//			std::ofstream out ("grid-3d_quarter_plate_merged.eps");
+//			GridOut grid_out;
+//			grid_out.write_eps (triangulation, out);
+//			std::cout << "Grid written to grid-3d_quarter_plate_merged.eps" << std::endl;
+//		}
+//		{
+//			std::ofstream out_ucd("Grid-3d_quarter_plate_merged.inp");
+//			GridOut grid_out;
+//			GridOutFlags::Ucd ucd_flags(true,true,true);
+//			grid_out.set_flags(ucd_flags);
+//			grid_out.write_ucd(triangulation, out_ucd);
+//			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
+//		}
+	}
+
+	template <int dim>
+	void assemble_contact
+	(
+			const typename DoFHandler<dim>::active_cell_iterator &cell,
+			const double &penalty_stiffness,
+			const FESystem<dim> &fe,
+			FEFaceValues<dim> &fe_face_values_ref,
+			const FEValuesExtractors::Vector u_fe,
+			const unsigned int n_q_points_f,
+			const Vector<double> &current_solution,
+			const std::vector<types::global_dof_index> local_dof_indices,
+			FullMatrix<double> &cell_matrix,
+			Vector<double> &cell_rhs
+	)
+	{
+		// Assemble the contact pair
+		assemble_contact(
+							cell,
+							rigid_wall,
+							enums::id_boundary_yPlus,
+							penalty_stiffness,
+							fe,
+							fe_face_values_ref,
+							u_fe,
+							n_q_points_f,
+							current_solution,
+							local_dof_indices,
+							cell_matrix,
+							cell_rhs
+						 );
 	}
 }
