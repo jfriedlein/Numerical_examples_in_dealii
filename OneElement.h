@@ -37,9 +37,20 @@ namespace OneElement
 	 };
 
 	// Wall
-	 Point<2> wall_point_on_plane = Point<2>(0.0,1.00);
-	 const Point<2> wall_normal_unit_vector = Point<2>(0,-1.0);
-	 std::shared_ptr<WallRigid<2>> rigid_wall = std::shared_ptr<WallRigid<2>>(new WallRigid<2>( {wall_point_on_plane,wall_normal_unit_vector,wall_normal_unit_vector} , {} ));
+//	 Point<2> wall_point_on_plane = Point<2>(0.0,1.0);
+//	 const Point<2> wall_normal_unit_vector = Point<2>(0,-1.0);
+//	 std::shared_ptr<WallRigid<2>> rigid_wall = std::shared_ptr<WallRigid<2>>(new WallRigid<2>( {wall_point_on_plane,wall_normal_unit_vector,wall_normal_unit_vector} , {} ));
+
+//	 Point<2> wall_point_on_plane = Point<2>(0.5,1.0);
+//	 const Point<2> wall_normal_unit_vector = Point<2>(0,-1.0);
+//	 std::shared_ptr<HalfWallRigid<2>> rigid_wall = std::shared_ptr<HalfWallRigid<2>>(new HalfWallRigid<2>( {wall_point_on_plane,wall_normal_unit_vector,wall_normal_unit_vector} , {-1} ));
+
+
+	// Punch
+	 Point<2> punch_center = Point<2>(0.0,3.0);
+	 const Point<2> punch_loading_vector = Point<2>(0.,-1.);
+	 std::shared_ptr<SphereRigid<2>> rigid_wall = std::shared_ptr<SphereRigid<2>>(new SphereRigid<2>( {punch_center,punch_loading_vector,punch_loading_vector}, {1.0,0,0} ));
+
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
@@ -433,9 +444,9 @@ namespace OneElement
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
-		const double width = 1; // unit cube
+		const double width = parameter.width;
 
-		GridGenerator::hyper_cube(triangulation);
+		GridGenerator::hyper_cube(triangulation,0,width);
 
 		//Clear boundary ID's
 		for (typename Triangulation<dim>::active_cell_iterator
@@ -487,7 +498,14 @@ namespace OneElement
 //					 cell = triangulation.begin_active();
 //					 cell != triangulation.end(); ++cell)
 //		{
-//			cell->vertex(3)[enums::y] -= 0.05;
+//			//cell->vertex(3)[enums::y] -= 0.15;
+//			Point<dim> corner_leftBottom (width,0);
+//			for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+//			  if ( (cell->vertex(vertex)).distance(corner_leftBottom)<1e-12 )
+//			  {
+//				  cell->vertex(vertex)[enums::x] -= 0.1;
+//				  break;
+//			  }
 //		}
 
 		triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
@@ -542,6 +560,7 @@ namespace OneElement
 			const FEValuesExtractors::Vector u_fe,
 			const unsigned int n_q_points_f,
 			const Vector<double> &current_solution,
+			std::vector< std::shared_ptr< PointHistory<dim> > > lqph,
 			const std::vector<types::global_dof_index> local_dof_indices,
 			FullMatrix<double> &cell_matrix,
 			Vector<double> &cell_rhs
@@ -558,6 +577,7 @@ namespace OneElement
 							u_fe,
 							n_q_points_f,
 							current_solution,
+							lqph,
 							local_dof_indices,
 							cell_matrix,
 							cell_rhs
