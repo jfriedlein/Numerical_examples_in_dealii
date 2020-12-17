@@ -66,28 +66,51 @@ namespace SphereRigid_Cube
 	 const unsigned int beam_type = enums::SRC_clamped_sliding;
 	 const unsigned int loading_type = enums::loading_by_contact;
 
+	 const double die_diameter = 2.;
+	 const double sheet_thickness = 1.;
+	 const double die_depth = 0.5;
+	 const double punch_radius = 1.;
+	 const double die_outer_radius_edge = 0.25;
+	 const double width_support = die_diameter+2.;
+
+	 const double die_width_bottom = ( (die_outer_radius_edge > die_depth) ? (die_diameter - std::sqrt(2.*die_outer_radius_edge*die_depth - die_depth*die_depth ))
+			 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	   : (die_diameter - die_outer_radius_edge) );
 	// @note We cannot add contact faces that point away from the punch and are on the other side of the body
+	// @note If the rigid body contours overlap, then the order we call the contact pairs is important
 	 // @todo add "dim" instead of "2"
 	// Punch
-	 Point<2> punch_center = Point<2>(0.0,2.04);
+	 Point<2> punch_center = Point<2>(0.0,sheet_thickness + punch_radius + 1e-6);
 	 const Point<2> punch_loading_vector = Point<2>(0.,-1.);
-	 const double punch_radius = 1.;
-	 std::shared_ptr<SphereRigid<2>> rigid_punch = std::shared_ptr<SphereRigid<2>>(new SphereRigid<2>( {punch_center,punch_loading_vector,punch_loading_vector} , {punch_radius} ));
+	 std::shared_ptr<SphereRigid<2>> rigid_punch = std::shared_ptr<SphereRigid<2>>(new SphereRigid<2>( {punch_center,punch_loading_vector,punch_loading_vector}, {punch_radius,0,0} ));
+
+	// Wall on the bottom (half wall extending to the left)
+	 Point<2> wall_point_on_plane = Point<2>(die_width_bottom,-die_depth);
+	 const Point<2> wall_normal_unit_vector = Point<2>(0,1.0);
+	 std::shared_ptr<HalfWallRigid<2>> rigid_bottom = std::shared_ptr<HalfWallRigid<2>>(new HalfWallRigid<2>( {wall_point_on_plane,wall_normal_unit_vector,wall_normal_unit_vector} , {-1.} ));
+
+	// Die on the right
+	 Point<2> die_right_center = Point<2>(die_diameter,-die_outer_radius_edge);
+	 const Point<2> die_ref_vector = Point<2>(0.,-1.);
+	 const double sphere_left = die_width_bottom;
+	 const double sphere_right = die_diameter;
+	 std::shared_ptr<SphereRigid<2>> rigid_die = std::shared_ptr<SphereRigid<2>>(new SphereRigid<2>( {die_right_center,die_ref_vector,die_ref_vector}, {die_outer_radius_edge,sphere_left,sphere_right} ));
+
+	// Wall on the right as support
+	 Point<2> die_point_on_plane = Point<2>(die_diameter,-1e-6);
+	 const Point<2> die_normal_unit_vector = Point<2>(0,1.);
+	 std::shared_ptr<HalfWallRigid<2>> rigid_support = std::shared_ptr<HalfWallRigid<2>>(new HalfWallRigid<2>( {die_point_on_plane,die_normal_unit_vector,die_normal_unit_vector} , {1.} ));
+
+	// Wall for holder
+	 Point<2> holder_point_on_plane = Point<2>(die_diameter,sheet_thickness);
+	 const Point<2> holder_normal_unit_vector = Point<2>(0,-1.);
+	 std::shared_ptr<HalfWallRigid<2>> rigid_holder = std::shared_ptr<HalfWallRigid<2>>(new HalfWallRigid<2>( {holder_point_on_plane,holder_normal_unit_vector,holder_normal_unit_vector} , {1.} ));
+
+	 // Conical punch
 //	 Point<2> punch_center = Point<2>(0.0,1.01);
 //	 const Point<2> punch_loading_vector = Point<2>(0.,-1.);
 //	 const double punch_radius = 0.75;
 //	 const double angle_cone = 20; // 20° cone angle to stabilise the computation
 //	 std::shared_ptr<RoundedPunch<2>> rigid_punch = std::shared_ptr<RoundedPunch<2>>(new RoundedPunch<2>( {punch_center,punch_loading_vector,punch_loading_vector} , {punch_radius,angle_cone} ));
-
-	// Wall on the bottom
-	 Point<2> wall_point_on_plane = Point<2>(0.0,-0.5);
-	 const Point<2> wall_normal_unit_vector = Point<2>(0,1.0);
-	 std::shared_ptr<WallRigid<2>> rigid_wall = std::shared_ptr<WallRigid<2>>(new WallRigid<2>( {wall_point_on_plane,wall_normal_unit_vector,wall_normal_unit_vector} , {} ));
-
-	// Die on the left
-	 Point<2> die_point_on_plane = Point<2>(1.5,-0.1);
-	 const Point<2> die_normal_unit_vector = Point<2>(-0.1,.5);
-	 std::shared_ptr<HalfWallRigid<2>> rigid_die = std::shared_ptr<HalfWallRigid<2>>(new HalfWallRigid<2>( {die_point_on_plane,die_normal_unit_vector,die_normal_unit_vector} , {} ));
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
@@ -183,6 +206,31 @@ namespace SphereRigid_Cube
 														);
 			}
 		}
+
+		// Niederhalter
+//		if ( true )
+//		{
+//			if (apply_dirichlet_bc == true )
+//			{
+//				VectorTools::interpolate_boundary_values(
+//															dof_handler_ref,
+//															enums::id_boundary_yPlus2,
+//															ZeroFunction<dim> (n_components),
+//															constraints,
+//															fe.component_mask(y_displacement)
+//														);
+//			}
+//			else
+//			{
+//				VectorTools::interpolate_boundary_values(
+//															dof_handler_ref,
+//															enums::id_boundary_yPlus2,
+//															ZeroFunction<dim> (n_components),
+//															constraints,
+//															fe.component_mask(y_displacement)
+//														);
+//			}
+//		}
 	}
 
 
@@ -191,8 +239,13 @@ namespace SphereRigid_Cube
 		void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
 		{
 			//create a vector of begin and end positions of the blocks
-			std::vector<double> x_position{0.,2.};
-			std::vector<double> y_position{0.,1.};
+			std::vector<double> x_position{0.,width_support};
+			std::vector<double> y_position{0.,sheet_thickness};
+
+			const unsigned int meshing_ratio = width_support/sheet_thickness;
+
+			if ( meshing_ratio==0 )
+				AssertThrow(false, ExcMessage("SphereRigid-cube - make_grid << Automatic mesh ratio is zero. Please modify the computation"));
 
 			body_dimensions[enums::x] = x_position[1];
 			body_dimensions[enums::x] = y_position[1];
@@ -204,7 +257,7 @@ namespace SphereRigid_Cube
 
 			//GridGenerator::subdivided_hyper_rectangle( triangulation, {1*parameter.nbr_global_refinements,4*parameter.nbr_global_refinements}, p1, p2 );
 			const unsigned int n_elements_per_dimension = std::pow( 2, parameter.nbr_global_refinements );
-			GridGenerator::subdivided_hyper_rectangle( triangulation, {2*n_elements_per_dimension,1*n_elements_per_dimension}, p1, p2 );
+			GridGenerator::subdivided_hyper_rectangle( triangulation, {1*meshing_ratio*n_elements_per_dimension,1*n_elements_per_dimension}, p1, p2 );
 
 			// Add the punch as a dummy body
 			// That is a bad way of doing it, because we add many dofs, we loop over in the assembly (expensive, useless)
@@ -262,7 +315,12 @@ namespace SphereRigid_Cube
 					//contact surface: rigid punch side - block
 					if ( cell->face(j)->at_boundary()
 							&& ( std::abs(cell->face(j)->center()[1] - y_position[1]) < 1e-10 )) // top
-						cell->face(j)->set_boundary_id(enums::id_boundary_yPlus);
+					{
+						if ( std::abs(cell->face(j)->center()[enums::x] > die_diameter ) )
+							cell->face(j)->set_boundary_id(enums::id_boundary_yPlus2);
+						else
+							cell->face(j)->set_boundary_id(enums::id_boundary_yPlus);
+					}
 					else if ( cell->face(j)->at_boundary()
 							&& ( std::abs(cell->face(j)->center()[0] - x_position[0]) < 1e-10 )) // left
 						cell->face(j)->set_boundary_id(enums::id_boundary_xMinus);
@@ -337,15 +395,33 @@ namespace SphereRigid_Cube
 			const FEValuesExtractors::Vector u_fe,
 			const unsigned int n_q_points_f,
 			const Vector<double> &current_solution,
+			std::vector< std::shared_ptr< PointHistory<dim> > > lqph,
 			const std::vector<types::global_dof_index> local_dof_indices,
 			FullMatrix<double> &cell_matrix,
 			Vector<double> &cell_rhs
 	)
 	{
-		// Assemble the bottom wall
+		// Assemble the punch
 		assemble_contact(
 							cell,
-							rigid_wall,
+							rigid_punch,
+							enums::id_boundary_yPlus,
+							penalty_stiffness,
+							fe,
+							fe_face_values_ref,
+							u_fe,
+							n_q_points_f,
+							current_solution,
+							lqph,
+							local_dof_indices,
+							cell_matrix,
+							cell_rhs
+						 );
+
+		// Assemble the left die
+		assemble_contact(
+							cell,
+							rigid_die,
 							enums::id_boundary_yMinus,
 							penalty_stiffness,
 							fe,
@@ -353,15 +429,16 @@ namespace SphereRigid_Cube
 							u_fe,
 							n_q_points_f,
 							current_solution,
+							lqph,
 							local_dof_indices,
 							cell_matrix,
 							cell_rhs
 						 );
 
-		// Assemble the left die
+		// Assemble the bottom wall
 //		assemble_contact(
 //							cell,
-//							rigid_die,
+//							rigid_bottom,
 //							enums::id_boundary_yMinus,
 //							penalty_stiffness,
 //							fe,
@@ -374,17 +451,36 @@ namespace SphereRigid_Cube
 //							cell_rhs
 //						 );
 
-		// Assemble the punch
+
+		// Assemble the Niederhalter
 		assemble_contact(
 							cell,
-							rigid_punch,
-							enums::id_boundary_yPlus,
+							rigid_holder,
+							enums::id_boundary_yPlus2,
 							penalty_stiffness,
 							fe,
 							fe_face_values_ref,
 							u_fe,
 							n_q_points_f,
 							current_solution,
+							lqph,
+							local_dof_indices,
+							cell_matrix,
+							cell_rhs
+						 );
+
+		// Assemble the support
+		assemble_contact(
+							cell,
+							rigid_support,
+							enums::id_boundary_yMinus,
+							penalty_stiffness,
+							fe,
+							fe_face_values_ref,
+							u_fe,
+							n_q_points_f,
+							current_solution,
+							lqph,
 							local_dof_indices,
 							cell_matrix,
 							cell_rhs
