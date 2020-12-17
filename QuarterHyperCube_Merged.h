@@ -444,6 +444,9 @@ namespace QuarterHyperCube_Merged
 		  // size of the inner mesh (hypercube with hole) relative to size of the whole plate
 		  double ratio_x = parameter.ratio_x;
 
+		  // USER parameter
+		  const double refine_local_gradation = 0.75;
+
 		const double search_tolerance = parameters_internal.search_tolerance;
 
 		make_2d_quarter_plate_with_hole(
@@ -564,7 +567,7 @@ namespace QuarterHyperCube_Merged
 			{
 				for ( unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; face++ )
 				{
-					if ( cell->center()[enums::y] < width*0.75 )
+					if ( cell->center()[enums::y] < width*0.75/(std::pow(double(refine_counter),refine_local_gradation)+1.) )
 					{
 						cell->set_refine_flag();
 						break;
