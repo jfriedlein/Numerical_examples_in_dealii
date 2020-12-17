@@ -78,7 +78,8 @@ namespace Rod
 	}
 
 
-	/*
+	/**
+	 * @todo Use spherical manifold or sth on coarse mesh and only move a single node in, then do local refinements and all vertices will follow the curvature
 	 * @param triangulation
 	 * @param half_notch_length Half the length of the notch in y-direction. We only model 1/8 of the entire bar, hence only 1/2 of the notch length
 	 * @param notch_radius The radius of the rod that is left at y=0 in the notch
@@ -503,71 +504,77 @@ namespace Rod
 			  }
 		}
 
-		// Create a cylindrical manifold to be put on the outer cylindrical surface
-		 CylindricalManifold<dim> cylindrical_manifold_3d (y); // y-axis
-		 triangulation.set_manifold( parameters_internal.manifold_id_surf, cylindrical_manifold_3d );
+			// Create a cylindrical manifold to be put on the outer cylindrical surface
+			 CylindricalManifold<dim> cylindrical_manifold_3d (y); // y-axis
+			 triangulation.set_manifold( parameters_internal.manifold_id_surf, cylindrical_manifold_3d );
 
-		// Global refinement of the mesh to get a better approximation of the contour:\n
-		// Previous: 2 elements for quarter arc; After global refinement: 4 elements
-		 triangulation.refine_global( 1 );
+		if ( parameter.refine_special == enums::Mesh_refine_special_standard )
+		{
+			// Global refinement of the mesh to get a better approximation of the contour:\n
+			// Previous: 2 elements for quarter arc; After global refinement: 4 elements
+			 triangulation.refine_global( 1 );
 
-		// Add some local refinements:
-		// Cells are cut in y-direction, so we simple get some more cells that will be rearranged subsequently
-		// @note For some reason I cannot cut_y two cells that lie next to each other. Hence, I only refine the cell at the y0-plane
-		 for (unsigned int refine_counter=0; refine_counter < n_additional_refinements; refine_counter++)
-		 {
-			for (typename Triangulation<dim>::active_cell_iterator
-			   cell = triangulation.begin_active();
-			   cell != triangulation.end(); ++cell)
-			{
-				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-					if (cell->face(face)->at_boundary())
-						if ( std::abs(cell->face(face)->center()[y])<search_tolerance )
-						{
-							cell->set_refine_flag(RefinementCase<dim>::cut_y); // refine only in the y-direction
-							break;
-						}
-			}
-			triangulation.execute_coarsening_and_refinement();
-		 }
+			// Add some local refinements:
+			// Cells are cut in y-direction, so we simple get some more cells that will be rearranged subsequently
+			// @note For some reason I cannot cut_y two cells that lie next to each other. Hence, I only refine the cell at the y0-plane
+			 for (unsigned int refine_counter=0; refine_counter < n_additional_refinements; refine_counter++)
+			 {
+				for (typename Triangulation<dim>::active_cell_iterator
+				   cell = triangulation.begin_active();
+				   cell != triangulation.end(); ++cell)
+				{
+					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+						if (cell->face(face)->at_boundary())
+							if ( std::abs(cell->face(face)->center()[y])<search_tolerance )
+							{
+								cell->set_refine_flag(RefinementCase<dim>::cut_y); // refine only in the y-direction
+								break;
+							}
+				}
+				triangulation.execute_coarsening_and_refinement();
+			 }
 
-	  // Shift the refinement layers in y-direction:
-	  // This is a bit tricky and can best be comprehended on paper for specific example values.
-		double initial_pos, new_pos;
+		  // Shift the refinement layers in y-direction:
+		  // This is a bit tricky and can best be comprehended on paper for specific example values.
+			double initial_pos, new_pos;
 
-		const unsigned int nbr_of_y_cells = 4 + n_additional_refinements;
-		unsigned int nbr_of_coarse_y_cells = std::min(int(std::ceil(nbr_of_y_cells/2.)),n_max_of_elements_in_the_coarse_area);
-		const unsigned int nbr_of_fine_y_cells = nbr_of_y_cells - nbr_of_coarse_y_cells;
+			const unsigned int nbr_of_y_cells = 4 + n_additional_refinements;
+			unsigned int nbr_of_coarse_y_cells = std::min(int(std::ceil(nbr_of_y_cells/2.)),n_max_of_elements_in_the_coarse_area);
+			const unsigned int nbr_of_fine_y_cells = nbr_of_y_cells - nbr_of_coarse_y_cells;
 
-		// Shift the coarsest cells such that the coarser outer area is uniformly discretised
-		 for ( unsigned int i=1; i<=3; i++ )
-		 {
-			initial_pos = half_length * (4-i)/4.;
-			new_pos = (nbr_of_coarse_y_cells - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
-			shift_vertex_layer( triangulation, initial_pos, new_pos, y );
-		 }
-
-		// We have to grab a few more cells from the local refinements in case we want more than 9 cells in y-direction
-		 if ( nbr_of_coarse_y_cells>4 )
-			for ( unsigned int i=3; i<=(nbr_of_coarse_y_cells-2); i++ )
-			{
-				initial_pos = half_length * 1./(std::pow(2,i));
-				new_pos = (nbr_of_coarse_y_cells-1 - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
+			// Shift the coarsest cells such that the coarser outer area is uniformly discretised
+			 for ( unsigned int i=1; i<=3; i++ )
+			 {
+				initial_pos = half_length * (4-i)/4.;
+				new_pos = (nbr_of_coarse_y_cells - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
 				shift_vertex_layer( triangulation, initial_pos, new_pos, y );
-			}
+			 }
 
-		// A small trick to get this general framework to operate even for the two lowest refinements 1 and 2
-		 if ( n_additional_refinements <= 2 )
-			 nbr_of_coarse_y_cells = 4;
+			// We have to grab a few more cells from the local refinements in case we want more than 9 cells in y-direction
+			 if ( nbr_of_coarse_y_cells>4 )
+				for ( unsigned int i=3; i<=(nbr_of_coarse_y_cells-2); i++ )
+				{
+					initial_pos = half_length * 1./(std::pow(2,i));
+					new_pos = (nbr_of_coarse_y_cells-1 - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
+					shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+				}
 
-		// Now we are down to the notch length
-		 for ( unsigned int i=(nbr_of_coarse_y_cells-1); i<=(n_additional_refinements+2); i++ )
-		 {
-			initial_pos = half_length * 1./(std::pow(2,i));
-			new_pos = (nbr_of_y_cells-1 - i)/double(nbr_of_fine_y_cells)  * half_notch_length;
-			shift_vertex_layer( triangulation, initial_pos, new_pos, y );
-		 }
+			// A small trick to get this general framework to operate even for the two lowest refinements 1 and 2
+			 if ( n_additional_refinements <= 2 )
+				 nbr_of_coarse_y_cells = 4;
 
+			// Now we are down to the notch length
+			 for ( unsigned int i=(nbr_of_coarse_y_cells-1); i<=(n_additional_refinements+2); i++ )
+			 {
+				initial_pos = half_length * 1./(std::pow(2,i));
+				new_pos = (nbr_of_y_cells-1 - i)/double(nbr_of_fine_y_cells)  * half_notch_length;
+				shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+			 }
+		}
+		else if ( parameter.refine_special == enums::Rod_refine_special_uniform )
+		{
+
+		}
 		// Generate the notch
 		 notch_body( triangulation, half_notch_length, radius, notch_radius, R );
 
@@ -624,17 +631,29 @@ namespace Rod
 			x = 0, y = 1
 		};
 
-		Assert(parameter.nbr_holeEdge_refinements>0, ExcMessage("Rod<< Mesh not implemented for only 4 elements in total. Please increase the nbr_holeEdge_refinements to at least 1."));
-
 		// Create in a first step the triangulation representing 1/8 of a cylinder
 		 {
 			// First we create a cylinder
-			 Point<dim> p1 (0,0);
+			// @todo Can we also create a cylinder in 2D (equals a rectangle, but identical to 3D)
+			 Point<dim> p1 (0.,0.);
 			 Point<dim> p2 (radius,half_length);
-			 GridGenerator::hyper_rectangle(triangulation, p1, p2);
 
-			// Let's first refine the "cylinder" ones, because the initial mesh is a brick
-			 triangulation.refine_global( 2 );
+			if ( parameter.refine_special == enums::Mesh_refine_special_standard )
+			{
+				if ( parameter.nbr_holeEdge_refinements == 0 )
+					AssertThrow(parameter.nbr_holeEdge_refinements>0, ExcMessage("Rod<< Mesh not implemented for only 4 elements in total. Please increase the nbr_holeEdge_refinements to at least 1."));
+
+				GridGenerator::hyper_rectangle(triangulation, p1, p2);
+				// Let's first refine the "cylinder" ones, because the initial mesh is a brick
+				 triangulation.refine_global( 2 );
+			}
+			else if ( parameter.refine_special == enums::Rod_refine_special_uniform )
+			{
+				 std::vector< unsigned int > repetitions (dim);
+				 repetitions[enums::x] = 1;
+				 repetitions[enums::y] = 4;
+				 GridGenerator::subdivided_hyper_rectangle(triangulation, repetitions, p1, p2);
+			}
 		 }
 
 		// Clear boundary ID's
@@ -668,63 +687,73 @@ namespace Rod
 			  }
 		}
 
-		// Add some local refinements:
-		// Cells are cut in y-direction, so we simple get some more cells that will be rearranged subsequently
-		// @note For some reason I cannot cut_y two cells that lie next to each other. Hence, I only refine the cell at the y0-plane
-		 for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
-		 {
-			for (typename Triangulation<dim>::active_cell_iterator
-			   cell = triangulation.begin_active();
-			   cell != triangulation.end(); ++cell)
-			{
-				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-					if (cell->face(face)->at_boundary())
-						if ( std::abs(cell->face(face)->center()[y])<search_tolerance )
-						{
-							cell->set_refine_flag(RefinementCase<dim>::cut_y); // refine only in the y-direction
-							break;
-						}
-			}
-			triangulation.execute_coarsening_and_refinement();
-		 }
 
-	  // ToDo-optimize: Isn't this very similar to the 3D case? Maybe merge 2D and 3D, also the surrounding code seems familiar
-	  // Shift the refinement layers in y-direction:
-	  // This is a bit tricky and can best be comprehended on paper for specific example values.
-		double initial_pos, new_pos;
+		if ( parameter.refine_special == enums::Mesh_refine_special_standard )
+		{
+			// Add some local refinements:
+			// Cells are cut in y-direction, so we simple get some more cells that will be rearranged subsequently
+			// @note For some reason I cannot cut_y two cells that lie next to each other. Hence, I only refine the cell at the y0-plane
+			 for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
+			 {
+				for (typename Triangulation<dim>::active_cell_iterator
+				   cell = triangulation.begin_active();
+				   cell != triangulation.end(); ++cell)
+				{
+					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+						if (cell->face(face)->at_boundary())
+							if ( std::abs(cell->face(face)->center()[y])<search_tolerance )
+							{
+								cell->set_refine_flag(RefinementCase<dim>::cut_y); // refine only in the y-direction
+								break;
+							}
+				}
+				triangulation.execute_coarsening_and_refinement();
+			 }
 
-		const unsigned int nbr_of_y_cells = 4 + parameter.nbr_holeEdge_refinements;
-		unsigned int nbr_of_coarse_y_cells = std::min(int(std::ceil(nbr_of_y_cells/2.)),n_max_of_elements_in_the_coarse_area);
-		const unsigned int nbr_of_fine_y_cells = nbr_of_y_cells - nbr_of_coarse_y_cells;
+		  // ToDo-optimize: Isn't this very similar to the 3D case? Maybe merge 2D and 3D, also the surrounding code seems familiar
+		 // @todo Check use of anisotropic refinements for neighbouring elements instead of this splitting and shifting
+			// @todo Also consider the use of dII subdivided_hyper_rectangle with step_sizes for "graded meshes"
+		  // Shift the refinement layers in y-direction:
+		  // This is a bit tricky and can best be comprehended on paper for specific example values.
+			double initial_pos, new_pos;
 
-		// Shift the coarsest cells such that the coarser outer area is uniformly discretised
-		 for ( unsigned int i=1; i<=3; i++ )
-		 {
-			initial_pos = half_length * (4-i)/4.;
-			new_pos = (nbr_of_coarse_y_cells - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
-			shift_vertex_layer( triangulation, initial_pos, new_pos, y );
-		 }
+			const unsigned int nbr_of_y_cells = 4 + parameter.nbr_holeEdge_refinements;
+			unsigned int nbr_of_coarse_y_cells = std::min(int(std::ceil(nbr_of_y_cells/2.)),n_max_of_elements_in_the_coarse_area);
+			const unsigned int nbr_of_fine_y_cells = nbr_of_y_cells - nbr_of_coarse_y_cells;
 
-		// We have to grab a few more cells from the local refinements in case we want more than 9 cells in y-direction
-		 if ( nbr_of_coarse_y_cells>4 )
-			for ( unsigned int i=3; i<=(nbr_of_coarse_y_cells-2); i++ )
-			{
-				initial_pos = half_length * 1./(std::pow(2,i));
-				new_pos = (nbr_of_coarse_y_cells-1 - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
+			// Shift the coarsest cells such that the coarser outer area is uniformly discretised
+			 for ( unsigned int i=1; i<=3; i++ )
+			 {
+				initial_pos = half_length * (4-i)/4.;
+				new_pos = (nbr_of_coarse_y_cells - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
 				shift_vertex_layer( triangulation, initial_pos, new_pos, y );
-			}
+			 }
 
-		// A small trick to get this general framework to operate even for the two lowest refinements 1 and 2
-		 if ( parameter.nbr_holeEdge_refinements<=2 )
-			 nbr_of_coarse_y_cells = 4;
+			// We have to grab a few more cells from the local refinements in case we want more than 9 cells in y-direction
+			 if ( nbr_of_coarse_y_cells>4 )
+				for ( unsigned int i=3; i<=(nbr_of_coarse_y_cells-2); i++ )
+				{
+					initial_pos = half_length * 1./(std::pow(2,i));
+					new_pos = (nbr_of_coarse_y_cells-1 - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
+					shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+				}
 
-		// Now we are down to the notch length
-		 for ( unsigned int i=(nbr_of_coarse_y_cells-1); i<=(parameter.nbr_holeEdge_refinements+2); i++ )
-		 {
-			initial_pos = half_length * 1./(std::pow(2,i));
-			new_pos = (nbr_of_y_cells-1 - i)/double(nbr_of_fine_y_cells)  * half_notch_length;
-			shift_vertex_layer( triangulation, initial_pos, new_pos, y );
-		 }
+			// A small trick to get this general framework to operate even for the two lowest refinements 1 and 2
+			 if ( parameter.nbr_holeEdge_refinements<=2 )
+				 nbr_of_coarse_y_cells = 4;
+
+			// Now we are down to the notch length
+			 for ( unsigned int i=(nbr_of_coarse_y_cells-1); i<=(parameter.nbr_holeEdge_refinements+2); i++ )
+			 {
+				initial_pos = half_length * 1./(std::pow(2,i));
+				new_pos = (nbr_of_y_cells-1 - i)/double(nbr_of_fine_y_cells)  * half_notch_length;
+				shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+			 }
+		}
+		else if ( parameter.refine_special == enums::Rod_refine_special_uniform )
+		{
+			 triangulation.refine_global( 2 );
+		}
 
 		// Generate the notch
 		 notch_body( triangulation, half_notch_length, radius, notch_radius, R );
@@ -777,25 +806,28 @@ namespace Rod
 			const FEValuesExtractors::Scalar y_displacement(1);
 
 			// on X0 plane
-			if (apply_dirichlet_bc == true )
+			//if ( dim==3 ) // only for 3D?
 			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_xMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(x_displacement)
-														);
-			}
-			else	// in the exact same manner
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_xMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(x_displacement)
-														);
+				if (apply_dirichlet_bc == true )
+				{
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																enums::id_boundary_xMinus,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(x_displacement)
+															);
+				}
+				else	// in the exact same manner
+				{
+					VectorTools::interpolate_boundary_values(
+																dof_handler_ref,
+																enums::id_boundary_xMinus,
+																ZeroFunction<dim> (n_components),
+																constraints,
+																fe.component_mask(x_displacement)
+															);
+				}
 			}
 
 			// on Y0 edge
