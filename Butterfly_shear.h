@@ -297,6 +297,7 @@ namespace Butterfly_shear
 
 			triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
+			const double refine_local_spread = 1.2;
 			{
 				for ( unsigned int nbr_local_ref=0; nbr_local_ref<parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
 				{
@@ -307,7 +308,7 @@ namespace Butterfly_shear
 						for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
 						  {
 							// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
-							if ( cell->face(face)->center()[enums::x] > width_w && cell->face(face)->center()[enums::x] < (width_w+width_b) )
+							if ( cell->face(face)->center()[enums::x] > width_w/refine_local_spread && cell->face(face)->center()[enums::x] < (width_w+width_b)*refine_local_spread )
 							{
 								cell->set_refine_flag();
 								break;
