@@ -41,7 +41,7 @@ namespace BarModel
 	 };
 
 	// USER PARAMETERS
-	 const bool constrain_sideways_sliding_of_loaded_face = false;
+	 const bool constrain_sideways_sliding_of_loaded_face = true;
 
 	// Loading type and required modifications
 	// @note "compression": \n
@@ -76,9 +76,10 @@ namespace BarModel
 		const FEValuesExtractors::Scalar y_displacement(1);
 
 		// on X0 plane
-		if ( loading_type==enums::compression )
+		if ( loading_type==enums::compression || loading_type==enums::Brick_Seupel_etal_a )
 		{
 			// For compression we cannot apply a symmetry constraint on the X0 plane
+			// because we model the entire bar
 		}
 		else
 		{
@@ -105,7 +106,7 @@ namespace BarModel
 			}
 
 		// on Y0 edge
-		if ( loading_type==enums::compression )
+		if ( loading_type==enums::compression || loading_type==enums::Brick_Seupel_etal_a )
 		{
 			// For compression we fix/clamp the Y0 plane, so it does not run away
 			FEValuesExtractors::Vector displacements(0);
@@ -263,7 +264,7 @@ namespace BarModel
 		template <int dim>
 		void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
 		{
-			// ToDo-assure: the use the values from the parameter file
+			// ToDo-assure: use of the values from the parameter file
 			const double width = parameter.width; // use thickness=width for square bottom area
 			const double length = parameter.height;
 
@@ -291,6 +292,9 @@ namespace BarModel
 			 std::vector<unsigned int> repetitions (3);
 			 repetitions[0]=1; // x
 			 repetitions[1]=parameter.grid_y_repetitions; // y
+
+			if ( loading_type==enums::Brick_Seupel_etal_a )
+				repetitions[enums::x] = 3;
 
 			GridGenerator::subdivided_hyper_rectangle 	( 	triangulation,
 															repetitions,
@@ -347,6 +351,8 @@ namespace BarModel
 
 			if ( notch_rounded/*use round notch*/ && loading_type == enums::compression )
 				triangulation.refine_global(2);	// ... Parameter.prm file
+			else if (loading_type == enums::Brick_Seupel_etal_a )
+			{}
 			else
 				triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
@@ -364,7 +370,11 @@ namespace BarModel
 				// A quick assurance variable to assure that at least a single vertex has been found,
 				// so our search criterion where to look for the vertices is not completely off
 				 bool found_vertex=false;
-				 double notch_location = ( (loading_type==enums::compression) ? ((length-width)/2.+width) : 0. );
+				 double notch_location = 0.;;
+				 if (loading_type==enums::compression)
+					 notch_location = (length-width)/2.+width;
+				 else if ( loading_type==enums::Brick_Seupel_etal_a )
+					 notch_location = 2.5;
 
 				// Looping over all cells to notch the to-be-notched cells
 				 for ( typename Triangulation<dim>::active_cell_iterator
@@ -451,6 +461,29 @@ namespace BarModel
 
 				triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 			}
+			else if ( loading_type==enums::Brick_Seupel_etal_a )
+			{
+				// Find the inclined faces
+				for (typename Triangulation<dim>::active_cell_iterator
+							 cell = triangulation.begin_active();
+							 cell != triangulation.end(); ++cell)
+				{
+					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+				    {
+						Point<dim> face_center = cell->face(face)->center();
+						if ( face_center[enums::x] < (width*99./100.) && face_center[enums::x] > (width*7./8.+width/100.) )
+							cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_right_radius);
+				    }
+				}
+
+				// For the right radius
+				 Point<dim> centre_right_radius (9.8, 2.5 );
+				 static SphericalManifold<dim> spherical_manifold_right (centre_right_radius);
+				 triangulation.set_manifold(parameters_internal.manifold_id_right_radius,spherical_manifold_right);
+			}
+
+			if ( loading_type==enums::Brick_Seupel_etal_a )
+				triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
 			// Refine in a special manner locally, if the number of local refinements is >0
 			if ( parameter.nbr_holeEdge_refinements > 0 )
@@ -469,6 +502,29 @@ namespace BarModel
 								// Find all cells that lay in an exemplary damage band with size 2xnotch_length along the diagonal
 								if (    face_center[enums::y] < ((length-width)/2. + notch_length + face_center[enums::x])
 									 && face_center[enums::y] > ((length-width)/2. - notch_length + face_center[enums::x]) )
+								{
+									cell->set_refine_flag();
+									break;
+								}
+							  }
+						}
+						triangulation.execute_coarsening_and_refinement();
+					}
+				}
+				else if ( loading_type == enums::Brick_Seupel_etal_a )
+				{
+					for ( unsigned int nbr_local_ref=0; nbr_local_ref<parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
+					{
+						for (typename Triangulation<dim>::active_cell_iterator
+									 cell = triangulation.begin_active();
+									 cell != triangulation.end(); ++cell)
+						{
+							for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+							  {
+								Point<dim> face_center = cell->face(face)->center();
+								// Find all cells that lay in an exemplary damage band with size 2xnotch_length along the diagonal
+								if (    face_center[enums::y] < (2.5 + width + notch_length - face_center[enums::x])
+									 && face_center[enums::y] > (2.5 + width - notch_length - face_center[enums::x]) )
 								{
 									cell->set_refine_flag();
 									break;
