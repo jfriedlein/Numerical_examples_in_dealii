@@ -41,14 +41,14 @@ namespace BarModel
 	 };
 
 	// USER PARAMETERS
-	 const bool constrain_sideways_sliding_of_loaded_face = true;
+	 const bool constrain_sideways_sliding_of_loaded_face = false;
 
 	// Loading type and required modifications
 	// @note "compression": \n
 	// We use different boundary conditions and notch the body in the middle of its length and not a y=0.
 	// @note "tension" or "standard": \n
 	// We model 1/8 of the entire body and notch the body at y=0 (equals the middle of the entire body).
-	 const enums::enum_loading_type loading_type = enums::compression;
+	 const enums::enum_loading_type loading_type = enums::Brick_Seupel_etal_a;
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
@@ -276,6 +276,9 @@ namespace BarModel
 
 			 const bool notch_rounded = true;
 
+			 // refine horizontally (0) or diagonally (1)
+			 const double refine_area_slope = 0.;
+
 			body_dimensions[enums::x] = width;
 			body_dimensions[enums::y] = length;
 
@@ -289,10 +292,11 @@ namespace BarModel
 			 Point<dim> p2 (width, length); // extends in y-direction its length (loaded in y-direction as the other models)
 
 			// vector containing the number of elements in each dimension
-			 std::vector<unsigned int> repetitions (3);
+			 std::vector<unsigned int> repetitions (dim);
 			 repetitions[0]=1; // x
 			 repetitions[1]=parameter.grid_y_repetitions; // y
 
+			 // Ensures by hardcoding upper bound that initial mesh is coarser than indentation
 			if ( loading_type==enums::Brick_Seupel_etal_a )
 				repetitions[enums::x] = 3;
 
@@ -353,12 +357,19 @@ namespace BarModel
 				triangulation.refine_global(2);	// ... Parameter.prm file
 			else if (loading_type == enums::Brick_Seupel_etal_a )
 			{}
-			else
-				triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
 			// @warning When implementing the compression example we moved the notching in front of the local refinements.
 			// @todo Does that do something?
 			// Notch the specimen by moving some nodes inwards to form a notch
+			 double notch_location = 0.;
+			 if (loading_type==enums::compression)
+				 notch_location = (length-width)/2.+width;
+			 else if ( loading_type==enums::Brick_Seupel_etal_a )
+				 //notch_location = 2.5;
+			 	 notch_location = 8.4; // a multiple of 1.4
+			 else // notch at symmetry plane
+				 notch_location=0.;
+
 			if ( damage_trigger_by_notching )
 			{
 				// Declare the shift vector for the notching
@@ -370,11 +381,6 @@ namespace BarModel
 				// A quick assurance variable to assure that at least a single vertex has been found,
 				// so our search criterion where to look for the vertices is not completely off
 				 bool found_vertex=false;
-				 double notch_location = 0.;;
-				 if (loading_type==enums::compression)
-					 notch_location = (length-width)/2.+width;
-				 else if ( loading_type==enums::Brick_Seupel_etal_a )
-					 notch_location = 2.5;
 
 				// Looping over all cells to notch the to-be-notched cells
 				 for ( typename Triangulation<dim>::active_cell_iterator
@@ -393,6 +399,10 @@ namespace BarModel
 							  found_vertex = true;
 						  }
 				 }
+
+				 // REfine the notched body
+				if ( loading_type == enums::standard )
+					triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
 				AssertThrow(found_vertex, ExcMessage("BarModel<< We weren't able to find at least a single vertex to be notched."));
 
@@ -477,7 +487,7 @@ namespace BarModel
 				}
 
 				// For the right radius
-				 Point<dim> centre_right_radius (9.8, 2.5 );
+				 Point<dim> centre_right_radius (width+width*notch_reduction, notch_location );
 				 static SphericalManifold<dim> spherical_manifold_right (centre_right_radius);
 				 triangulation.set_manifold(parameters_internal.manifold_id_right_radius,spherical_manifold_right);
 			}
@@ -523,8 +533,8 @@ namespace BarModel
 							  {
 								Point<dim> face_center = cell->face(face)->center();
 								// Find all cells that lay in an exemplary damage band with size 2xnotch_length along the diagonal
-								if (    face_center[enums::y] < (2.5 + width + notch_length - face_center[enums::x])
-									 && face_center[enums::y] > (2.5 + width - notch_length - face_center[enums::x]) )
+								if (    face_center[enums::y] < (notch_location + notch_length - face_center[enums::x]*refine_area_slope)
+									 && face_center[enums::y] > (notch_location - notch_length - face_center[enums::x]*refine_area_slope) )
 								{
 									cell->set_refine_flag();
 									break;
@@ -558,32 +568,38 @@ namespace BarModel
 			}
 
 			// Mark the innermost cell(s) for softening to trigger the damage development
-			if ( triangulation.n_active_cells()>1)
-			{
-				bool found_cell=false;
-				for (typename Triangulation<dim>::active_cell_iterator
-							 cell = triangulation.begin_active();
-							 cell != triangulation.end(); ++cell)
-				{
-					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
-					 // Find the cell that has one vertex at the origin
-	//				  if ( (cell->vertex(vertex)).distance(centre)<1e-12 )
-					 // Find cells that lay on the xz-plane (y=0)
-					  if ( std::abs(cell->vertex(vertex)[1]) < 1 ) // vs 1e-12 used previously
-					  {
-						  // Avoid overwriting the tracked cell
-						  if ( cell->material_id() != enums::tracked_QP )
-							  cell->set_material_id(1);
-						  found_cell = true;
-						  break;
-					  }
-
-					if ( /*only weaken one cell:*/ false  && found_cell )	// ToDo: check: does a break leave only the inner for-loop?
-						break;
-				}
-
-				AssertThrow(found_cell, ExcMessage("BarModel<< Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
-			}
+//			if ( triangulation.n_active_cells()>1)
+//			{
+//				bool found_cell=false;
+//				for (typename Triangulation<dim>::active_cell_iterator
+//							 cell = triangulation.begin_active();
+//							 cell != triangulation.end(); ++cell)
+//				{
+//					Point<dim> cell_center = cell->center();
+//					if ( cell_center[enums::x]>=4.2 && cell_center[enums::y]>=7.8 && cell_center[enums::x]<=9.0 )
+//					{
+//						cell->set_material_id(99);
+//						found_cell = true;
+//					}
+////					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+//					 // Find the cell that has one vertex at the origin
+//	//				  if ( (cell->vertex(vertex)).distance(centre)<1e-12 )
+//					 // Find cells that lay on the xz-plane (y=0)
+////					  if ( std::abs(cell->vertex(vertex)[1]) < 1 ) // vs 1e-12 used previously
+////					  {
+////						  // Avoid overwriting the tracked cell
+////						  if ( cell->material_id() != enums::tracked_QP )
+////							  cell->set_material_id(1);
+////						  found_cell = true;
+////						  break;
+////					  }
+//
+//					if ( /*only weaken one cell:*/false  && found_cell )	// ToDo: check: does a break leave only the inner for-loop?
+//						break;
+//				}
+//
+//				AssertThrow(found_cell, ExcMessage("BarModel<< Was not able to identify the cell at the origin(0,0,0). Please recheck the triangulation or adapt the code."));
+//			}
 
 
 			// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
