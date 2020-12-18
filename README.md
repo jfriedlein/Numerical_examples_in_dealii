@@ -9,6 +9,8 @@ A collection of different numerical examples implemented in deal.ii
 ## Changelog
 Proposal for updated standard:
 - contain member variable named body_dimensions (see Bar_model), which contains characteristic dimensions (length, width, thickness) and maybe also some for paths (e.g. the location of the evaluation path); This could also generalise/simplify e.g. the search for the symmetry planes, because we just write body_dimensions[x] to get the x-dimension, without caring about the actual name.
+- incorporating contact and many more numerical examples (updated soon)
+
 
 From the 24.07.2020 we obey a new standard (numExS07).
 
