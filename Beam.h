@@ -258,7 +258,6 @@ namespace Beam
 
 			// USER PARAMETERS
 			 double refined_fraction=length/4.;
-			 bool refinement_only_globally = false;
 
 			body_dimensions[enums::x] = length;
 			body_dimensions[enums::y] = width;
@@ -531,7 +530,6 @@ namespace Beam
 
 		// USER PARAMETERS
 		 double refined_fraction=length/4.;
-		 bool refinement_only_globally = false;
 
 		body_dimensions[enums::x] = length;
 		body_dimensions[enums::y] = width;

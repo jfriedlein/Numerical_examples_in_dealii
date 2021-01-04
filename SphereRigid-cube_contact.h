@@ -366,6 +366,11 @@ namespace SphereRigid_Cube
 	template <int dim>
 	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
+		AssertThrow( false, ExcMessage("SphereRigid-cube_contact - make_grid 3D<< not implemented"));
+
+		// Just to get rid of the unused variable warnings
+		 GridGenerator::hyper_cube(triangulation);
+		 std::cout << "degree " << parameter.degree << std::endl;
 
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 //		{
