@@ -8,14 +8,25 @@ A collection of different numerical examples implemented in deal.ii
 
 ## Changelog
 Proposal for updated standard:
-- contain member variable named body_dimensions (see Bar_model), which contains characteristic dimensions (length, width, thickness) and maybe also some for paths (e.g. the location of the evaluation path); This could also generalise/simplify e.g. the search for the symmetry planes, because we just write body_dimensions[x] to get the x-dimension, without caring about the actual name.
+- group additional parameter
+- create standalone make_grid, with all parameters are explicit input argument
+
+Still being implemented consistently:
+From the 04.01.2021 we obey a new standard (numExS11).
+
+- contain member variable named body_dimensions (see Bar_model), which contains characteristic dimensions (length, width, thickness) and maybe also some for paths (e.g. the location of the evaluation path);
 - incorporating contact and many more numerical examples (updated soon)
+
+Major changes:
+* clean-up
+* contact
+* member variable named body_dimensions, which contains characteristic dimensions (length, width, thickness) 
 
 
 From the 24.07.2020 we obey a new standard (numExS07).
 
 Major changes:
-* cleanup of boundary ids
+* clean-up of boundary ids
 * option to specify the loading direction and the loaded faces
 
 
@@ -38,6 +49,22 @@ Creates the triangulation (2D or 3D), requires additional parameters (can also b
 
 Apply the boundary conditions onto the faces, e.g. symmetry BC.
 
+## Available numerical examples
+The names try to be as general as possible. Look closely, there are many options, so e.g. the HyperRectangle is not just a rectangle, but can be notched multiple times by defined round notches.
+
+### HyperCube: one-element (also distorted) & Distorted 8 element patch test
+By setting the number of global refinements to zero, you obtain the one-element test.
+For number of global refinements equal to 1 (in 3D) you obtain 8 Elements arranged as a cube, which can also be distorted internally (overall still a cube, but distorted but matching elements inside). With the option (twitch) the Dis8El version can also be twitched, so it is no longer a cube
+
+@todo add picture of OET and distored OET
+
+<img src="https://github.com/jfriedlein/Numerical_examples_in_dealii/blob/master/images/Dis8El.png" width="250">
+
+### HyperRectangle: 
+For the bar or sheet strip (just a matter of the width) initial inhomogenous refinements are available. For finite plasticity, we recommend making the finer mesh part approximately a square to also capture the shear bands (develop for isotropy at 55°).
+
+
+
 
 ### Rod
 Parameters
@@ -54,15 +81,6 @@ Be aware that you can also choose the geometry of the notch (round, sharp), whic
 <img src="https://github.com/jfriedlein/Numerical_examples_in_dealii/blob/master/images/Rod%20-%20geometry%20notch60.jpg" width="500">
 
 ### Quarter/Eight of a plate with hole
-
-### Bar or sheet strip
-For the bar or sheet strip (just a matter of the width) initial inhomogenous refinements are available. For finite plasticity, we recommend making the finer mesh part approximately a square to also capture the shear bands (develop for isotropy at 55°).
-
-### One element test (also distorted) & Distorted 8 elements
-By setting the number of global refinements to zero, you obtain the one-element test.
-For number of global refinements equal to 1 (in 3D) you obtain 8 Elements arranged as a cube, which can also be distorted internally (overall still a cube, but distorted but matching elements inside).
-
-<img src="https://github.com/jfriedlein/Numerical_examples_in_dealii/blob/master/images/Dis8El.png" width="250">
 
 
 ### Tensile specimen SEP1230 (parameterised)
