@@ -1,3 +1,4 @@
+// deal.II headers
 #include <deal.II/grid/tria.h>
 #include <deal.II/grid/tria_accessor.h>
 #include <deal.II/grid/tria_iterator.h>
@@ -5,11 +6,14 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/manifold_lib.h>
 
+// C++ headers for some math operations
 #include <iostream>
 #include <fstream>
 #include <cmath>
 
-#include "../MA-Code/enumerator_list.h"
+// Numerical example helper function (required, can be downloaded from https://github.com/jfriedlein/Numerical_examples_in_dealii)
+// also contains enumerators as part of "enums::"
+#include "./numEx-helper_fnc.h"
 
 using namespace dealii;
 
@@ -18,13 +22,12 @@ namespace enums
 {
 	/**
 	 * Clamping types
-	 * @todo Add "beam" to names "enum_beam_clamping" and "beam_clamped_free" etc.
 	 */
-	 enum enum_clamping
+	 enum enum_Beam_clamping
 	 {
-		clamped_free = 0,   //!< clamped_free: left face is fixed in all directions, right face is unconstrained
-		clamped_sliding = 1,//!< clamped_sliding: left face is fixed in all directions, right face can slide in y-direction
-		clamped_clamped = 2 //!< clamped_clamped: @todo Not yet implemented
+		beam_clamped_free = 0,   //!< clamped_free: left face is fixed in all directions, right face is unconstrained
+		beam_clamped_sliding = 1,//!< clamped_sliding: left face is fixed in all directions, right face can slide in y-direction
+		beam_clamped_clamped = 2 //!< clamped_clamped: @todo Not yet implemented
 	 };
 }
 
@@ -33,7 +36,7 @@ namespace Beam
 /*
  * A beam along x with one symmetry constraint in z, loaded in y-direction
  *
- * CERTIFIED TO STANDARD numExS07 (200724)
+ * CERTIFIED TO STANDARD xxx
  */
 {
 	// The loading direction: \n
@@ -54,7 +57,7 @@ namespace Beam
 	 };
 
 	// USER PARAMETER
-	 const unsigned int beam_type = enums::clamped_sliding;
+	 const unsigned int beam_type = enums::beam_clamped_sliding;
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
@@ -212,7 +215,7 @@ namespace Beam
 															constraints,
 															fe.component_mask(y_displacement)
 														);
-				if ( beam_type==enums::clamped_sliding )
+				if ( beam_type==enums::beam_clamped_sliding )
 					VectorTools::interpolate_boundary_values(
 																dof_handler_ref,
 																id_boundary_load,
@@ -230,7 +233,7 @@ namespace Beam
 															constraints,
 															fe.component_mask(y_displacement)
 														);
-				if ( beam_type==enums::clamped_sliding )
+				if ( beam_type==enums::beam_clamped_sliding )
 					VectorTools::interpolate_boundary_values(
 																dof_handler_ref,
 																id_boundary_load,
