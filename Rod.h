@@ -31,8 +31,8 @@ namespace Rod
 
 	// Here you can choose between a radial notch (smooth dent) and a sharp triangular notch (viewed in the cross section)
 	// USER parameter
-	 const bool radial_notch = false;
-
+	 const enums::enum_notch_type notch_type = enums::notch_linear;
+	 
 	// Some internal parameters
 	 struct parameterCollection
 	 {
@@ -40,138 +40,6 @@ namespace Rod
 
 		const double search_tolerance = 1e-12;
 	 };
-
-	/*
-	 * Shift a layer of vertices of the triangulation at the coord position \a initial_pos to the position \a new_pos
-	 * @param direction Gives the shift direction 0(x), 1(y), 2(z)
-	 */
-	template <int dim>
-	void shift_vertex_layer( Triangulation<dim> &triangulation, double &initial_pos, double &new_pos, unsigned int direction )
-	{
-		bool shifted_node = false;
-		for (typename Triangulation<dim>::active_cell_iterator
-		   cell = triangulation.begin_active();
-		   cell != triangulation.end(); ++cell)
-		{
-		  for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_cell; ++vertex )
-		  {
-			  if ( std::abs( cell->vertex(vertex)[direction] - initial_pos) < 1e-12/*search_tolerance*/ )
-			  {
-				  Point<dim> shift_vector;
-				  shift_vector[direction] = (new_pos-initial_pos);
-				  cell->vertex(vertex) += shift_vector;
-				  shifted_node = true; // -> We have shifted at least a single node
-			  }
-		  }
-		}
-		// Ensure that we shifted at least a single node
-		 AssertThrow( shifted_node==true, ExcMessage("shift_vertex_layer<< You haven't moved a single node. Please check the selection criterion initial_pos."));
-	}
-
-
-	double get_current_notch_radius( double &y_coord, const double &half_notch_length, const double &radius, const double &notch_radius, const double &R  )
-	{
-		if ( radial_notch )
-			return R + notch_radius - std::sqrt( R*R - y_coord*y_coord );
-		else  /*linear notch*/
-			return y_coord/half_notch_length * (radius-notch_radius) + notch_radius;
-	}
-
-
-	/**
-	 * @todo Use spherical manifold or sth on coarse mesh and only move a single node in, then do local refinements and all vertices will follow the curvature
-	 * @param triangulation
-	 * @param half_notch_length Half the length of the notch in y-direction. We only model 1/8 of the entire bar, hence only 1/2 of the notch length
-	 * @param notch_radius The radius of the rod that is left at y=0 in the notch
-	 * @param R The radius of the notch corresponds to the tool radius that could be used on a lathe to create the notch.
-	 */
-	template <int dim>
-	void notch_body( Triangulation<dim> &triangulation, const double &half_notch_length, const double &radius, const double &notch_radius, const double &R  )
-	{
-		enum enum_coord_directions
-		{
-			x = 0, y = 1, z = 2
-		};
-		const double search_tolerance = 1e-12;
-
-		if ( /*Deep notch: also adapt inner nodes in the notched area*/true )
-		{
-			// ToDo-optimize: Do we need the \a index_list anymore? (compare shallow notch below)
-			std::vector<unsigned int> index_list;
-
-			// Generate the notch
-			 for (typename Triangulation<dim>::active_cell_iterator
-			   cell = triangulation.begin_active();
-			   cell != triangulation.end(); ++cell)
-			 {
-				  for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_cell; ++vertex)
-				  {
-					  // We look for all the points that lie in the notched area (y-coord in half length of notch)
-					   double y_coord = cell->vertex(vertex)[y];
-					   unsigned int index_vertex = cell->vertex_index(vertex);
-					   if ( y_coord < half_notch_length && (std::find(index_list.begin(), index_list.end(), index_vertex) == index_list.end()) )
-					   {
-						  double x_coord = cell->vertex(vertex)[x];
-						  double vertex_radius, z_coord;
-						  if ( dim==2 )
-							  vertex_radius=x_coord;
-						  else if ( dim==3 )
-						  {
-							  z_coord = cell->vertex(vertex)[z];
-							  vertex_radius = std::sqrt(x_coord*x_coord + z_coord*z_coord);
-						  }
-						  // The radius of the leftover notched material describes an arc along the y-coord.
-						  // Hence, the radius of the notch changes with the y-coord
-						   double current_notch_radius = get_current_notch_radius(y_coord, half_notch_length, radius, notch_radius, R );
-						  // Set the shift vector that moves the vertex inwards (along its radius)
-						   Point<dim> shift_vector;
-						   shift_vector[x] = (current_notch_radius - radius) * std::sqrt(vertex_radius/radius) * x_coord/radius;
-						   if ( dim==3 )
-							   shift_vector[z] = (current_notch_radius - radius) * std::sqrt(vertex_radius/radius) * z_coord/radius;
-						  // Apply the shift vector to the vertex
-						   cell->vertex(vertex) += shift_vector;
-						  // Add the current vertex to the list of already shifted vertices
-						   index_list.push_back(index_vertex);
-					   }
-				  }
-			 }
-		}
-		else /*only move the outer nodes of the notch inwards, this is limited to shallow notches and does not distort the inner cells*/
-		{
-			Assert( (radius - notch_radius) < radius/6.,
-					ExcMessage("Rod<< You choose the shallow notching, but your notch seems to be very deep. Consider using the deep notch option above."));
-			 for (typename Triangulation<dim>::active_cell_iterator
-			   cell = triangulation.begin_active();
-			   cell != triangulation.end(); ++cell)
-			 {
-			  for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-				if (cell->face(face)->at_boundary())
-				  for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
-				  {
-					  // We look for all the points that lie in the notched area (y-coord in half length of notch)
-					   double y_coord = cell->face(face)->vertex(vertex)[y];
-					   if ( y_coord < half_notch_length )
-					   {
-						  double x_coord = cell->face(face)->vertex(vertex)[x];
-						  double z_coord = cell->face(face)->vertex(vertex)[z];
-						  // Look for point that lies on the outer surface
-						   if ( std::abs( std::sqrt(x_coord*x_coord + z_coord*z_coord) - radius ) < search_tolerance )
-						   {
-							  // The radius of the leftover notched material describes an arc along the y-coord.
-							  // Hence, the radius of the notch changes with the y-coord
-							   double current_notch_radius = R + notch_radius - std::sqrt( R*R - y_coord*y_coord );
-							  // Set the shift vector that moves the vertex inwards
-							   Point<dim> shift_vector;
-							   shift_vector[0] = (current_notch_radius - radius) / radius * x_coord ;
-							   shift_vector[2] = (current_notch_radius - radius) / radius * z_coord;
-							  // Apply the shift vector to the vertex
-							   cell->face(face)->vertex(vertex) += shift_vector;
-						   }
-					   }
-				  }
-			 }
-		}
-	}
 
 
 // 3d grid
@@ -343,7 +211,7 @@ namespace Rod
 		 {
 			initial_pos = half_length * (4-i)/4.;
 			new_pos = (nbr_of_coarse_y_cells - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
-			shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+			numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
 		 }
 
 		// We have to grab a few more cells from the local refinements in case we want more than 9 cells in y-direction
@@ -352,7 +220,7 @@ namespace Rod
 			{
 				initial_pos = half_length * 1./(std::pow(2,i));
 				new_pos = (nbr_of_coarse_y_cells-1 - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
-				shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+				numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
 			}
 
 		// A small trick to get this general framework to operate even for the two lowest refinements 1 and 2
@@ -364,11 +232,11 @@ namespace Rod
 		 {
 			initial_pos = half_length * 1./(std::pow(2,i));
 			new_pos = (nbr_of_y_cells-1 - i)/double(nbr_of_fine_y_cells)  * half_notch_length;
-			shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+			numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
 		 }
 
 	    // Generate the notch
-		 notch_body( triangulation, half_notch_length, radius, notch_radius, R );
+		 numEx::notch_body( triangulation, half_notch_length, radius, notch_radius, R, notch_type, true );
 
 		// Possibly some additional global isotropic refinements
 		 triangulation.refine_global(n_global_refinements);	// ... Parameter.prm file
@@ -547,7 +415,7 @@ namespace Rod
 			 {
 				initial_pos = half_length * (4-i)/4.;
 				new_pos = (nbr_of_coarse_y_cells - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
-				shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+				numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
 			 }
 
 			// We have to grab a few more cells from the local refinements in case we want more than 9 cells in y-direction
@@ -556,7 +424,7 @@ namespace Rod
 				{
 					initial_pos = half_length * 1./(std::pow(2,i));
 					new_pos = (nbr_of_coarse_y_cells-1 - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
-					shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+					numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
 				}
 
 			// A small trick to get this general framework to operate even for the two lowest refinements 1 and 2
@@ -568,7 +436,7 @@ namespace Rod
 			 {
 				initial_pos = half_length * 1./(std::pow(2,i));
 				new_pos = (nbr_of_y_cells-1 - i)/double(nbr_of_fine_y_cells)  * half_notch_length;
-				shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+				numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
 			 }
 		}
 		else if ( parameter.refine_special == enums::Rod_refine_special_uniform )
@@ -576,7 +444,7 @@ namespace Rod
 
 		}
 		// Generate the notch
-		 notch_body( triangulation, half_notch_length, radius, notch_radius, R );
+		 numEx::notch_body( triangulation, half_notch_length, radius, notch_radius, R, notch_type, true );
 
 		// Possibly some additional global isotropic refinements
 		 triangulation.refine_global(n_global_refinements);	// ... Parameter.prm file
@@ -726,7 +594,7 @@ namespace Rod
 			 {
 				initial_pos = half_length * (4-i)/4.;
 				new_pos = (nbr_of_coarse_y_cells - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
-				shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+				numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
 			 }
 
 			// We have to grab a few more cells from the local refinements in case we want more than 9 cells in y-direction
@@ -735,7 +603,7 @@ namespace Rod
 				{
 					initial_pos = half_length * 1./(std::pow(2,i));
 					new_pos = (nbr_of_coarse_y_cells-1 - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
-					shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+					numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
 				}
 
 			// A small trick to get this general framework to operate even for the two lowest refinements 1 and 2
@@ -747,7 +615,7 @@ namespace Rod
 			 {
 				initial_pos = half_length * 1./(std::pow(2,i));
 				new_pos = (nbr_of_y_cells-1 - i)/double(nbr_of_fine_y_cells)  * half_notch_length;
-				shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+				numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
 			 }
 		}
 		else if ( parameter.refine_special == enums::Rod_refine_special_uniform )
@@ -756,7 +624,7 @@ namespace Rod
 		}
 
 		// Generate the notch
-		 notch_body( triangulation, half_notch_length, radius, notch_radius, R );
+		 numEx::notch_body( triangulation, half_notch_length, radius, notch_radius, R, notch_type, true );
 
 		// Possibly some additional global isotropic refinements
 		 triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
