@@ -9,8 +9,9 @@
 #include <fstream>
 #include <cmath>
 
-#include "../MA-Code/enumerator_list.h"
-
+// Numerical example helper function (required, can be downloaded from https://github.com/jfriedlein/Numerical_examples_in_dealii)
+// also contains enumerators as part of "enums::"
+#include "./numEx-helper_fnc.h"
 
 using namespace dealii;
 
@@ -33,6 +34,10 @@ namespace Rod
 	// USER parameter
 	 const enums::enum_notch_type notch_type = enums::notch_linear;
 	 
+	// BC
+	 const enums::enum_BC BC_yPlus  = enums::BC_x0_z0;
+//	 const enums::enum_BC BC_yPlus  = enums::BC_none;
+
 	// Some internal parameters
 	 struct parameterCollection
 	 {
@@ -273,7 +278,14 @@ namespace Rod
 		const double half_notch_length = parameter.notchWidth/2.;//8.98/2.;
 		const double notch_radius = parameter.ratio_x * radius; // 0.982
 
-		const unsigned int n_additional_refinements = parameter.nbr_holeEdge_refinements;
+		unsigned int n_additional_refinements = parameter.nbr_holeEdge_refinements;
+		unsigned int n_refinements_innermost = 0;
+		if ( parameter.refine_special == enums::Mesh_refine_special_innermost )
+		{
+			n_additional_refinements = 4; // hardcoded to get ...
+			n_refinements_innermost = parameter.nbr_holeEdge_refinements; // ... the nbr of local refinements as innermost refinements
+		}
+
 		const unsigned int n_global_refinements = parameter.nbr_global_refinements;
 		const int n_max_of_elements_in_the_coarse_area = 6;
 
@@ -376,7 +388,8 @@ namespace Rod
 			 CylindricalManifold<dim> cylindrical_manifold_3d (y); // y-axis
 			 triangulation.set_manifold( parameters_internal.manifold_id_surf, cylindrical_manifold_3d );
 
-		if ( parameter.refine_special == enums::Mesh_refine_special_standard )
+		double cell_size_innermost = 9e9;
+		if ( parameter.refine_special == enums::Mesh_refine_special_standard || parameter.refine_special == enums::Mesh_refine_special_innermost )
 		{
 			// Global refinement of the mesh to get a better approximation of the contour:\n
 			// Previous: 2 elements for quarter arc; After global refinement: 4 elements
@@ -438,16 +451,51 @@ namespace Rod
 				new_pos = (nbr_of_y_cells-1 - i)/double(nbr_of_fine_y_cells)  * half_notch_length;
 				numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
 			 }
+
+			// We store the size of the innermost cell from the last new_pos
+			 cell_size_innermost = new_pos;
 		}
 		else if ( parameter.refine_special == enums::Rod_refine_special_uniform )
 		{
-
+			// Do nothing
 		}
-		// Generate the notch
-		 numEx::notch_body( triangulation, half_notch_length, radius, notch_radius, R, notch_type, true );
 
 		// Possibly some additional global isotropic refinements
+		// @todo-assure: We shifted these global refinements before the special innermost refinements, so
+		// we truely only refine the actual innermost cell.
 		 triangulation.refine_global(n_global_refinements);	// ... Parameter.prm file
+
+		// For the innermost refinement case, we also focus the refinements specifically on the
+		// innermost cell, in addition to the above refinement of the notched region
+		 if ( parameter.refine_special == enums::Mesh_refine_special_innermost )
+		 {
+			 for (unsigned int refine_counter=0; refine_counter < n_refinements_innermost; refine_counter++)
+			 {
+				for (typename Triangulation<dim>::active_cell_iterator
+				   cell = triangulation.begin_active();
+				   cell != triangulation.end(); ++cell)
+				{
+					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+						if (cell->face(face)->at_boundary())
+							if ( std::abs(cell->face(face)->center()[y]) < search_tolerance )
+							{
+								if ( refine_counter==0 || refine_counter==2 )
+									cell->set_refine_flag(); // isotropic refinement
+								else
+									cell->set_refine_flag(RefinementCase<dim>::cut_y); // refine only in the y-direction
+								//cell->set_refine_flag(RefinementCase<dim>::cut_y); // refine only in the y-direction
+								break;
+							}
+				}
+				triangulation.execute_coarsening_and_refinement();
+			 }
+		 }
+
+		// Generate the notch
+		// @note We keep on using the CylindricalManifold from above also for the notched cell faces,
+		// which should give us the nice curvature we want.
+		 if ( std::abs( parameter.ratio_x - 1. ) > 1e-10 )
+			 numEx::notch_body( triangulation, half_notch_length, radius, notch_radius, R, notch_type, true );
 
 //		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 //		{
@@ -746,6 +794,13 @@ namespace Rod
 															);
 				}
 			}
+
+			// BC for the yPlus
+			 if ( BC_yPlus==enums::BC_x0_z0 )
+			 {
+				numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+				numEx::BC_apply( enums::id_boundary_yPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+			 }
 
 			if ( parameter.driver == enums::Dirichlet )
 			{
