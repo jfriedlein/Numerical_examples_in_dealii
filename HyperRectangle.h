@@ -50,20 +50,22 @@ namespace HyperRectangle
 	// All additional parameters
 	const bool trigger_localisation_by_notching = true;
 	const enums::enum_coord notched_face = enums::x;
-	const bool use_fine_and_coarse_brick = true;
+	const bool use_fine_and_coarse_brick = false;
 	const bool refine_local_isotropic = false;
 	const bool notch_round = true;
 	
 	// Boundary conditions
 	 const bool constrain_sideways_sliding_of_loaded_face = false;
-	 const bool apply_sym_constraint_on_top_face = false; // to simulate plane strain for 3D
+	 const bool apply_sym_constraint_on_top_face = false; // to simulate plane strain for 3D, top face refers to zPlus
 	 
-	 const enums::enum_BC BC_xMinus = enums::BC_sym; // standard, tension
-	 const enums::enum_BC BC_yMinus = enums::BC_sym; // standard, tension
+//	 const enums::enum_BC BC_xMinus = enums::BC_sym; // standard, tension
+//	 const enums::enum_BC BC_yPlus  = enums::BC_none; // compression, Seupel et al
+//	 const enums::enum_BC BC_yMinus = enums::BC_sym; // standard, tension
 	 const enums::enum_BC BC_zMinus = enums::BC_sym; // standard, tension
 
-//	 const enums::enum_BC BC_xMinus = enums::BC_none; // compression, Seupel et al
-//	 const enums::enum_BC BC_yMinus = enums::BC_fix; // compression, Seupel et al
+	 const enums::enum_BC BC_xMinus = enums::BC_none; // compression, Seupel et al
+	 const enums::enum_BC BC_yPlus  = enums::BC_x0; // compression, Seupel et al
+	 const enums::enum_BC BC_yMinus = enums::BC_fix; // compression, Seupel et al
 //	 const enums::enum_BC BC_zMinus = enums::BC_none; // 3D compression, Seupel et al
 
 	// Notching
@@ -116,7 +118,11 @@ namespace HyperRectangle
 		// BC for the loaded face
 		 if ( constrain_sideways_sliding_of_loaded_face )
 			numEx::BC_apply( id_boundary_load, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-		 
+
+		// BC for the yPlus
+		 if ( BC_yPlus==enums::BC_x0 )
+			numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+
 		// BC for the load ...
 		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver
 			numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
@@ -248,7 +254,7 @@ namespace HyperRectangle
 
 		
 		// Notch the brick
-		 if ( trigger_localisation_by_notching )
+		 if ( trigger_localisation_by_notching && notch.depth > 1e-20 )
 		 {
 			 if ( notch_round )
 			 {
