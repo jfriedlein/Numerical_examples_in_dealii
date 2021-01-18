@@ -93,6 +93,7 @@ namespace HyperCube
 	 * Apply the boundary conditions (support and load) on the given AffineConstraints \a constraints. \n
 	 * For the HyperCube that are three symmetry constraints on each plane (x=0, y=0, z=0) and the load on the \a id_boundary_load (for Dirichlet).
 	 * Alternatively, we apply the rigid body motion for contact.
+	 * @todo Change setup (see HyperR) where we define boundary for BC_xMinus and then use if ( BC_xMinus==... ), use the value of BC_xMinus directly
 	 */
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
