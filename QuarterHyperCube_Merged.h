@@ -559,7 +559,24 @@ namespace QuarterHyperCube_Merged
 //		}
 
 		// pre-refinement of the damaged area (around y=0)
-		for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
+		// One isotropic refinement ...
+		for (typename Triangulation<dim>::active_cell_iterator
+					 cell = triangulation.begin_active();
+					 cell != triangulation.end(); ++cell)
+		{
+			for ( unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_cell; vertex++ )
+			{
+				if ( cell->vertex(vertex)[enums::y] < 10  )
+				{
+					cell->set_refine_flag();
+					break;
+				}
+			}
+		}
+		triangulation.execute_coarsening_and_refinement();
+
+		// ... the rest is anisotropic
+		for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements-1; refine_counter++)
 		{
 			for (typename Triangulation<dim>::active_cell_iterator
 						 cell = triangulation.begin_active();
@@ -569,11 +586,33 @@ namespace QuarterHyperCube_Merged
 				{
 					if ( cell->center()[enums::y] < width*0.75/(std::pow(double(refine_counter),refine_local_gradation)+1.) )
 					{
-						cell->set_refine_flag();
+						//cell->set_refine_flag();
+						cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the y-direction
 						break;
 					}
 				}
 			}
+//			Point<dim> origin(50,0);
+//			for (typename Triangulation<dim>::active_cell_iterator
+//						 cell = triangulation.begin_active();
+//						 cell != triangulation.end(); ++cell)
+//			{
+//				for ( unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_cell; vertex++ )
+//				{
+//					//if ( std::abs( cell->vertex(vertex).distance(origin) -50 ) < 1e-5 && cell->vertex(vertex)[enums::y] < 25 )
+//					//if ( cell->vertex(vertex).distance(origin) < 1e-5 )
+//					if ( cell->vertex(vertex)[enums::y] < 10  )
+//					{
+//						//cell->set_refine_flag();
+//						cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the y-direction
+//						break;
+//					}
+////					else if ( std::abs( cell->vertex(vertex)[enums::x] - 100 ) < 1e-5 && cell->vertex(vertex)[enums::y] < 50 )
+////					{
+////						cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the y-direction
+////					}
+//				}
+//			}
 			triangulation.execute_coarsening_and_refinement();
 		}
 
