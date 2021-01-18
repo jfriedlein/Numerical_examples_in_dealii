@@ -60,14 +60,15 @@ namespace enums
     enum enum_refine_special
 	{
     	Mesh_refine_special_standard = 0,
-		Rod_refine_special_uniform = 1
+		Rod_refine_special_uniform = 1,
+		Mesh_refine_special_innermost = 2
 	};
     
     enum enum_coord
 	 {
 		x = 0,
 		y = 1,
-		z = 2,
+		z = 2
 		//r = 0,
 		//theta = 2,
 		//u = 0,
@@ -91,11 +92,16 @@ namespace enums
 	   notch_round = 1
    };
    
+   /**
+    * @todo Don't use x0 y0 etc.
+    */
    enum enum_BC
    {
-	   BC_none = 0,
-	   BC_sym = 1,
-	   BC_fix = 2
+	   BC_none = 0,//!< BC_none
+	   BC_sym = 1, //!< BC_sym
+	   BC_fix = 2, //!< BC_fix
+	   BC_x0 = 3,  //!< BC_x0
+	   BC_x0_z0 = 4   //!< BC_x0_z0
    };
 }
 
