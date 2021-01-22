@@ -49,6 +49,7 @@ namespace HyperCube
 	 std::vector<double> body_dimensions (5);
 	 
 	// Evaluation point
+	// @note We cannot init the point yet, because we don't have the geometry dimensions and geometry
 	 Point<3> eval_point;
 	 
 	// Evaluation path
