@@ -32,11 +32,12 @@ namespace Rod
 
 	// Here you can choose between a radial notch (smooth dent) and a sharp triangular notch (viewed in the cross section)
 	// USER parameter
+	 //const enums::enum_notch_type notch_type = enums::notch_round;
 	 const enums::enum_notch_type notch_type = enums::notch_linear;
-	 
+
 	// BC
-	 const enums::enum_BC BC_yPlus  = enums::BC_x0_z0;
-//	 const enums::enum_BC BC_yPlus  = enums::BC_none;
+//	 const enums::enum_BC BC_yPlus  = enums::BC_x0_z0; // special: not contraction of loaded face
+	 const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard
 
 	// Some internal parameters
 	 struct parameterCollection
@@ -458,6 +459,32 @@ namespace Rod
 		else if ( parameter.refine_special == enums::Rod_refine_special_uniform )
 		{
 			// Do nothing
+		}
+		else if ( parameter.refine_special == enums::Mesh_refine_special_Simo )
+		{
+			// Global refinement of the mesh to get a better approximation of the contour:\n
+			// Previous: 2 elements for quarter arc; After global refinement: 4 elements
+			 triangulation.refine_global( 1 );
+
+			// Add some local refinements:
+			// Cells are cut in y-direction, so we simple get some more cells that will be rearranged subsequently
+			// @note For some reason I cannot cut_y two cells that lie next to each other. Hence, I only refine the cell at the y0-plane
+			 for (unsigned int refine_counter=0; refine_counter < 4; refine_counter++)
+			 {
+				for (typename Triangulation<dim>::active_cell_iterator
+				   cell = triangulation.begin_active();
+				   cell != triangulation.end(); ++cell)
+				{
+					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+						if (cell->face(face)->at_boundary())
+							if ( std::abs(cell->face(face)->center()[y])<search_tolerance )
+							{
+								cell->set_refine_flag(RefinementCase<dim>::cut_y); // refine only in the y-direction
+								break;
+							}
+				}
+				triangulation.execute_coarsening_and_refinement();
+			 }
 		}
 
 		// Possibly some additional global isotropic refinements
