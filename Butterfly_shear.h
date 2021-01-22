@@ -23,6 +23,10 @@ namespace Butterfly_shear
 	// The loading direction: \n
 	// In which coordinate direction the load shall be applied, so x/y/z.
 	 const unsigned int loading_direction = enums::y;
+//	 const unsigned int loading_direction = enums::x;
+
+	// Evaluation point
+	 Point<3> eval_point;
 
 	// The loaded faces:
 	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_xPlus;
@@ -45,122 +49,15 @@ namespace Butterfly_shear
 							const bool &apply_dirichlet_bc, double &current_load_increment,
 							const Parameter::GeneralParameters &parameter )
 	{
-		/* inputs:
-		 * dof_handler_ref,
-		 * fe
-		 * apply_dirichlet_bc
-		 * constraints
-		 * current_load_increment
-		 */
-
-		// Symmetry constraints:
-		// Update and apply new constraints
-		//		on x0_plane for symmetry (displacement_in_x = 0)
-		//		on y0_plane for symmetry (displacement_in_y = 0)
-		//		on z0_plane for symmetry (displacement_in_z = 0)
-
-		parameterCollection parameters_internal;
-
-		const FEValuesExtractors::Vector displacement(0);
-		const FEValuesExtractors::Scalar x_displacement(0);
-		const FEValuesExtractors::Scalar y_displacement(1);
-
 		// on X0 plane fix all dofs
-		if (apply_dirichlet_bc == true )
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-			if ( dim==3 )
-			{
-				const FEValuesExtractors::Scalar z_displacement(2);
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_xMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
-		}
-		else	// in the exact same manner
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-			if ( dim==3 )
-			{
-				const FEValuesExtractors::Scalar z_displacement(2);
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_xMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
-		}
+		 numEx::BC_apply_fix( enums::id_boundary_xMinus, dof_handler_ref, fe, constraints );
 
-		if ( parameter.driver == 2/*Dirichlet*/ ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
-		{
-			// on loaded edge
-			if (apply_dirichlet_bc == true )
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															id_boundary_load,
-															ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
-															constraints,
-															fe.component_mask(y_displacement)
-														);
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															id_boundary_load,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(x_displacement)
-														);
-			}
-			else
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															id_boundary_load,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(y_displacement)
-														);
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															id_boundary_load,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(x_displacement)
-														);
-			}
-		}
+		// BC for the load ...
+		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver
+			numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+
+		 if ( loading_direction==enums::y )
+			numEx::BC_apply( id_boundary_load, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 	}
 
 
@@ -179,6 +76,18 @@ namespace Butterfly_shear
 
 			body_dimensions[enums::x] = 2.*width_w+width_b;
 			body_dimensions[enums::y] = height_w;
+
+			// Set the evaluation point
+			if ( loading_direction == enums::y )
+			{
+				 eval_point[enums::x] = body_dimensions[enums::x];
+				 eval_point[enums::y] = body_dimensions[enums::y];
+			}
+			else if ( loading_direction == enums::x )
+			{
+				 eval_point[enums::x] = body_dimensions[enums::x];
+				 eval_point[enums::y] = body_dimensions[enums::y]/2.;
+			}
 
 			parameterCollection parameters_internal;
 
