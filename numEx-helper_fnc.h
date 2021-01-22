@@ -61,7 +61,8 @@ namespace enums
 	{
     	Mesh_refine_special_standard = 0,
 		Rod_refine_special_uniform = 1,
-		Mesh_refine_special_innermost = 2
+		Mesh_refine_special_innermost = 2,
+		Mesh_refine_special_Simo = 3
 	};
     
     enum enum_coord
