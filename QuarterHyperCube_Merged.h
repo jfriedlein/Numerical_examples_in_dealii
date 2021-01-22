@@ -28,6 +28,16 @@ namespace QuarterHyperCube_Merged
 	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus;
 	 const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_xPlus;
 
+	 // QPlate
+	  const enums::enum_BC BC_xMinus = enums::BC_sym;
+	  const enums::enum_BC BC_xPlus = enums::BC_none;
+
+	 // DENP
+//	  const enums::enum_BC BC_xMinus = enums::BC_none;
+//	  const enums::enum_BC BC_xPlus = enums::BC_sym;
+
+	 const bool apply_sym_constraint_on_top_face = false;
+
 	// Some internal parameters
 	 struct parameterCollection
 	 {
@@ -59,127 +69,30 @@ namespace QuarterHyperCube_Merged
 		//		on x0_plane for symmetry (displacement_in_x = 0)
 		//		on y0_plane for symmetry (displacement_in_y = 0)
 
-		// on left edge
-		if (apply_dirichlet_bc == true )
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-		}
-		else	// in the exact same manner
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-		}
+		// BC on x0 plane
+		 if ( BC_xMinus==enums::BC_sym )
+			 numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+
+		 if ( BC_xPlus==enums::BC_sym )
+			 numEx::BC_apply( enums::id_boundary_xPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 		// on bottom edge
-		if (apply_dirichlet_bc == true )
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_yMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-		}
-		else	// in the exact same manner
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_yMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-		}
+		 numEx::BC_apply( enums::id_boundary_yMinus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
-		// on thickness symmetry plane
-		if ( dim==3 )
-		{
-			const FEValuesExtractors::Scalar z_displacement(2);
+		// BC on z0 plane ...
+		 if ( dim==3 ) // ... only for 3D
+		 {
+			// For compression we don't fix anything in the third direction, because y0 was already clamped.
+			// @todo However, what about the upper part?
+			 numEx::BC_apply( enums::id_boundary_zMinus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
-			if (apply_dirichlet_bc == true )
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_zMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
-			else	// in the exact same manner
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_zMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
+			if ( apply_sym_constraint_on_top_face )
+				numEx::BC_apply( enums::id_boundary_zPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		 }
 
-			if ( false/*apply sym BC on positive z-face also*/ )
-			{
-				if (apply_dirichlet_bc == true )
-				{
-					VectorTools::interpolate_boundary_values(
-																dof_handler_ref,
-																enums::id_boundary_zPlus,
-																ZeroFunction<dim> (n_components),
-																constraints,
-																fe.component_mask(z_displacement)
-															);
-				}
-				else	// in the exact same manner
-				{
-					VectorTools::interpolate_boundary_values(
-																dof_handler_ref,
-																enums::id_boundary_zPlus,
-																ZeroFunction<dim> (n_components),
-																constraints,
-																fe.component_mask(z_displacement)
-															);
-				}
-			}
-		}
-
-		if ( parameter.driver == 2/*Dirichlet*/ )
-		{
-			// on top/loaded edge
-			if (apply_dirichlet_bc == true )
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															id_boundary_load,
-															// ToDo: adapt this to also work for the load_history
-															ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
-															//ConstantFunction<dim> (parameter.pressure_load / nbr_loadsteps/*add only the increment*/, n_components),
-															constraints,
-															fe.component_mask(y_displacement)
-														);
-			}
-			else
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															id_boundary_load,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(y_displacement)
-														);
-			}
-		}
+		// BC for the load ...
+		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver, alternatively  ...
+			numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 	}
 
 	// ToDo-optimize: use existing DII command	void GridGenerator::plate_with_a_hole
@@ -560,62 +473,64 @@ namespace QuarterHyperCube_Merged
 
 		// pre-refinement of the damaged area (around y=0)
 		// One isotropic refinement ...
-		for (typename Triangulation<dim>::active_cell_iterator
-					 cell = triangulation.begin_active();
-					 cell != triangulation.end(); ++cell)
-		{
-			for ( unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_cell; vertex++ )
-			{
-				if ( cell->vertex(vertex)[enums::y] < 10  )
-				{
-					cell->set_refine_flag();
-					break;
-				}
-			}
-		}
-		triangulation.execute_coarsening_and_refinement();
-
-		// ... the rest is anisotropic
-		for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements-1; refine_counter++)
+		if ( parameter.nbr_holeEdge_refinements > 0 )
 		{
 			for (typename Triangulation<dim>::active_cell_iterator
 						 cell = triangulation.begin_active();
 						 cell != triangulation.end(); ++cell)
 			{
-				for ( unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; face++ )
+				for ( unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_cell; vertex++ )
 				{
-					if ( cell->center()[enums::y] < width*0.75/(std::pow(double(refine_counter),refine_local_gradation)+1.) )
+					if ( cell->vertex(vertex)[enums::y] < 30  )
 					{
-						//cell->set_refine_flag();
-						cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the y-direction
+						cell->set_refine_flag();
 						break;
 					}
 				}
 			}
-//			Point<dim> origin(50,0);
-//			for (typename Triangulation<dim>::active_cell_iterator
-//						 cell = triangulation.begin_active();
-//						 cell != triangulation.end(); ++cell)
-//			{
-//				for ( unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_cell; vertex++ )
-//				{
-//					//if ( std::abs( cell->vertex(vertex).distance(origin) -50 ) < 1e-5 && cell->vertex(vertex)[enums::y] < 25 )
-//					//if ( cell->vertex(vertex).distance(origin) < 1e-5 )
-//					if ( cell->vertex(vertex)[enums::y] < 10  )
-//					{
-//						//cell->set_refine_flag();
-//						cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the y-direction
-//						break;
-//					}
-////					else if ( std::abs( cell->vertex(vertex)[enums::x] - 100 ) < 1e-5 && cell->vertex(vertex)[enums::y] < 50 )
-////					{
-////						cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the y-direction
-////					}
-//				}
-//			}
 			triangulation.execute_coarsening_and_refinement();
-		}
 
+			// ... the rest is anisotropic
+			for (unsigned int refine_counter=0; refine_counter < parameter.nbr_holeEdge_refinements-1; refine_counter++)
+			{
+				for (typename Triangulation<dim>::active_cell_iterator
+							 cell = triangulation.begin_active();
+							 cell != triangulation.end(); ++cell)
+				{
+					for ( unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; face++ )
+					{
+						if ( cell->center()[enums::y] < width*0.75/(std::pow(double(refine_counter),refine_local_gradation)+1.) )
+						{
+							//cell->set_refine_flag();
+							cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the y-direction
+							break;
+						}
+					}
+				}
+	//			Point<dim> origin(50,0);
+	//			for (typename Triangulation<dim>::active_cell_iterator
+	//						 cell = triangulation.begin_active();
+	//						 cell != triangulation.end(); ++cell)
+	//			{
+	//				for ( unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_cell; vertex++ )
+	//				{
+	//					//if ( std::abs( cell->vertex(vertex).distance(origin) -50 ) < 1e-5 && cell->vertex(vertex)[enums::y] < 25 )
+	//					//if ( cell->vertex(vertex).distance(origin) < 1e-5 )
+	//					if ( cell->vertex(vertex)[enums::y] < 10  )
+	//					{
+	//						//cell->set_refine_flag();
+	//						cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the y-direction
+	//						break;
+	//					}
+	////					else if ( std::abs( cell->vertex(vertex)[enums::x] - 100 ) < 1e-5 && cell->vertex(vertex)[enums::y] < 50 )
+	////					{
+	////						cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the y-direction
+	////					}
+	//				}
+	//			}
+				triangulation.execute_coarsening_and_refinement();
+			}
+		}
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 		/*
 		{
