@@ -57,192 +57,68 @@ namespace Beam
 	 };
 
 	// USER PARAMETER
-	 const unsigned int beam_type = enums::beam_clamped_sliding;
+	 const unsigned int beam_type = enums::beam_clamped_free;
 
 	template<int dim>
 	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
-							const bool &apply_dirichlet_bc, double &current_load_increment,
+							const bool &apply_dirichlet_bc, double &current_load_increment, const double &lambda_n,
 							const Parameter::GeneralParameters &parameter )
 	{
-		/* inputs:
-		 * dof_handler_ref,
-		 * fe
-		 * apply_dirichlet_bc
-		 * constraints
-		 * current_load_increment
-		 */
+		// clamping on X0 plane: set x, y and z displacements on x0 plane to zero
+		 //numEx::BC_apply_fix( enums::id_boundary_xMinus, dof_handler_ref, fe, constraints );
+		 numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
-		// Symmetry constraints:
-		// Update and apply new constraints
-		//		on x0_plane for symmetry (displacement_in_x = 0)
-		//		on y0_plane for symmetry (displacement_in_y = 0)
-		//		on z0_plane for symmetry (displacement_in_z = 0)
+		// BC on z0 plane ...
+		 if ( dim==3 ) // ... only for 3D
+			numEx::BC_apply( enums::id_boundary_zMinus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
-		parameterCollection parameters_internal;
+		// BC for the load ...
+		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver, alternatively  ...
+		 {
+			if ( beam_type==enums::beam_clamped_sliding )
+				numEx::BC_apply( id_boundary_load, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
-		const FEValuesExtractors::Vector displacement(0);
-		const FEValuesExtractors::Scalar x_displacement(0);
-		const FEValuesExtractors::Scalar y_displacement(1);
+			// classical
+//			 numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
-		// clamping on X0 plane
-		// set x, y and z displacements on x0 plane to zero
-		if (apply_dirichlet_bc == true )
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-		}
-		else	// in the exact same manner
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-		}
-		if (apply_dirichlet_bc == true )
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-		}
-		else	// in the exact same manner
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-		}
-		if ( dim==3 )
-		{
-			const FEValuesExtractors::Scalar z_displacement(2);
-			if (apply_dirichlet_bc == true )
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_xMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
-			else	// in the exact same manner
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_xMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
-		}
+			// shear-free
+//			{
+//				const double lambda_n1 = lambda_n + current_load_increment;
+//				const double current_load_increment_x = body_dimensions[enums::x] * ( std::sin(lambda_n1)/lambda_n1 - 1. ) - body_dimensions[enums::x] * ( std::sin(lambda_n+1e-20)/(lambda_n+1e-20) - 1. );
+//				const double current_load_increment_y = body_dimensions[enums::x] * ( std::cos(lambda_n1)/lambda_n1 - 1./lambda_n1 ) - body_dimensions[enums::x] * ( std::cos(lambda_n+1e-10)/(lambda_n+1e-10) - 1./(lambda_n+1e-10) );
+//
+//				std::cout << "current_load_increment_x " << current_load_increment_x << std::endl;
+//				std::cout << "current_load_increment_y " << current_load_increment_y << std::endl;
+//
+//				numEx::BC_apply( id_boundary_load, enums::x, current_load_increment_x, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+//				numEx::BC_apply( id_boundary_load, enums::y, current_load_increment_y, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+//			}
 
-
-		// on Z0 plane
-		if ( dim==3 )
-		{
-			const FEValuesExtractors::Scalar z_displacement(2);
+			numEx::BeamEnd<dim> beamEnd (body_dimensions[enums::x], body_dimensions[enums::y], lambda_n, current_load_increment, n_components);
 
 			if (apply_dirichlet_bc == true )
 			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_zMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
-			else	// in the exact same manner
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_zMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
-
-			if ( false/*apply sym BC on positive z-face also*/ )
-			{
-				if (apply_dirichlet_bc == true )
-				{
-					VectorTools::interpolate_boundary_values(
-																dof_handler_ref,
-																enums::id_boundary_zPlus,
-																ZeroFunction<dim> (n_components),
-																constraints,
-																fe.component_mask(z_displacement)
-															);
-				}
-				else	// in the exact same manner
-				{
-					VectorTools::interpolate_boundary_values(
-																dof_handler_ref,
-																enums::id_boundary_zPlus,
-																ZeroFunction<dim> (n_components),
-																constraints,
-																fe.component_mask(z_displacement)
-															);
-				}
-			}
-		}
-
-		if ( parameter.driver == 2/*Dirichlet*/ ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
-		{
-			// on right face xplus edge
-			if (apply_dirichlet_bc == true )
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
+				// Apply the given load
+				 VectorTools::interpolate_boundary_values(
+						 dof_handler_ref,
 															id_boundary_load,
-															ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
-															constraints,
-															fe.component_mask(y_displacement)
-														);
-				if ( beam_type==enums::beam_clamped_sliding )
-					VectorTools::interpolate_boundary_values(
-																dof_handler_ref,
-																id_boundary_load,
-																ZeroFunction<dim> (n_components),
-																constraints,
-																fe.component_mask(x_displacement)
-															);
+															beamEnd,
+															constraints
+														 );
 			}
 			else
 			{
 				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
+						dof_handler_ref,
 															id_boundary_load,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(y_displacement)
+															ZeroFunction<dim> ( n_components ),
+															constraints
 														);
-				if ( beam_type==enums::beam_clamped_sliding )
-					VectorTools::interpolate_boundary_values(
-																dof_handler_ref,
-																id_boundary_load,
-																ZeroFunction<dim> (n_components),
-																constraints,
-																fe.component_mask(x_displacement)
-															);
 			}
-		}
+		 }
+		 else if ( parameter.driver == enums::Contact ) // ... as contact
+		 {
+	 	 }
 	}
 
 
@@ -545,7 +421,8 @@ namespace Beam
 		 Point<dim> p3 (length, 0, 0); // extends in y-direction its height (loaded in y-direction as the othe models)
 		 Point<dim> p4 (length, width, thickness);
 
-		if ( /*use fine and coarse brick*/false )
+		// Use fine and coarse brick
+		if ( parameter.refine_special==enums::Mesh_refine_special_standard )
 		{
 			// Vector containing the number of elements in each dimension
 			// The coarse segment consists of the set number of elements in the y-direction
@@ -598,11 +475,24 @@ namespace Beam
 				triangulation.execute_coarsening_and_refinement();
 			}
 		}
-		else // use uniform brick with xy refinements
+		// use uniform brick with xy refinements
+		else if ( parameter.refine_special==enums::Rod_refine_special_uniform )
 		{
 			 std::vector<unsigned int> repetitions (3);
 			 repetitions[enums::x] = std::pow(2.,parameter.nbr_holeEdge_refinements);
 			 repetitions[enums::y] = std::pow(2.,parameter.nbr_holeEdge_refinements); // y
+			 repetitions[enums::z] = parameter.nbr_elementsInZ;
+
+			 GridGenerator::subdivided_hyper_rectangle ( triangulation,
+														 repetitions,
+														 p1,
+														 p4 );
+		}
+		else if ( parameter.refine_special==enums::Mesh_refine_special_innermost )
+		{
+			 std::vector<unsigned int> repetitions (3);
+			 repetitions[enums::x] = parameter.grid_y_repetitions*2.;
+			 repetitions[enums::y] = parameter.grid_y_repetitions; // y
 			 repetitions[enums::z] = parameter.nbr_elementsInZ;
 
 			 GridGenerator::subdivided_hyper_rectangle ( triangulation,
