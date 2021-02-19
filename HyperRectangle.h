@@ -53,30 +53,33 @@ namespace HyperRectangle
 	const bool use_fine_and_coarse_brick = false;
 	const bool refine_local_isotropic = false;
 	const bool notch_round = true;
+	const bool notch_twice = true;
 	
 	// Boundary conditions
-	 const bool constrain_sideways_sliding_of_loaded_face = false;
+	 const bool constrain_sideways_sliding_of_loaded_face = true;
 	 const bool apply_sym_constraint_on_top_face = false; // to simulate plane strain for 3D, top face refers to zPlus
 	 
 //	 const enums::enum_BC BC_xMinus = enums::BC_sym; // standard, tension
-//	 const enums::enum_BC BC_yPlus  = enums::BC_none; // compression, Seupel et al
+//	 const enums::enum_BC BC_yPlus  = enums::BC_none; // standard, tension
 //	 const enums::enum_BC BC_yMinus = enums::BC_sym; // standard, tension
-	 const enums::enum_BC BC_zMinus = enums::BC_sym; // standard, tension
+//	 const enums::enum_BC BC_zMinus = enums::BC_sym; // standard, tension
 
 	 const enums::enum_BC BC_xMinus = enums::BC_none; // compression, Seupel et al
-	 const enums::enum_BC BC_yPlus  = enums::BC_x0; // compression, Seupel et al
+	 const enums::enum_BC BC_yPlus  = enums::BC_x0; // guide top face
 	 const enums::enum_BC BC_yMinus = enums::BC_fix; // compression, Seupel et al
-//	 const enums::enum_BC BC_zMinus = enums::BC_none; // 3D compression, Seupel et al
+	 const enums::enum_BC BC_zMinus = enums::BC_none; // 3D compression, Seupel et al
 
 	// Notching
 	 const types::manifold_id manifold_id_notch_left = 10;
+	 const types::manifold_id manifold_id_notch_right = 11;
 	 
 	// Loading type and required modifications
 	// @note "compression": \n
 	// We use different boundary conditions and notch the body in the middle of its length and not a y=0.
 	// @note "tension" or "standard": \n
 	// We model 1/8 of the entire body and notch the body at y=0 (equals the middle of the entire body).
-	 const enums::enum_loading_type loading_type = enums::Brick_Seupel_etal_a;
+	 //const enums::enum_loading_type loading_type = enums::Brick_Seupel_etal_a;
+	 const enums::enum_loading_type loading_type = enums::compression;
 
 	 
 	/**
@@ -115,12 +118,8 @@ namespace HyperRectangle
 				numEx::BC_apply( enums::id_boundary_zPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 		 }
 		 
-		// BC for the loaded face
-		 if ( constrain_sideways_sliding_of_loaded_face )
-			numEx::BC_apply( id_boundary_load, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-
 		// BC for the yPlus
-		 if ( BC_yPlus==enums::BC_x0 )
+		 if ( constrain_sideways_sliding_of_loaded_face && BC_yPlus==enums::BC_x0 )
 			numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 		// BC for the load ...
@@ -130,7 +129,7 @@ namespace HyperRectangle
 
 
 	void make_grid_flat( Triangulation<2> &tria_flat,
-						 const double &length, const double &width, const numEx::NotchClass<2> &notch,
+						 const double &length, const double &width, const std::vector< numEx::NotchClass<2> > &notch_list,
 						 const unsigned int n_elements_in_x_for_coarse_mesh, const unsigned int n_refine_global, const unsigned int n_refine_local )
 	{
 		parameterCollection parameters_internal;
@@ -254,19 +253,31 @@ namespace HyperRectangle
 
 		
 		// Notch the brick
-		 if ( trigger_localisation_by_notching && notch.depth > 1e-20 )
+		 if ( trigger_localisation_by_notching && notch_list[0].depth > 1e-20 )
 		 {
 			 if ( notch_round )
 			 {
 				 // prepare the mesh
-				  numEx::prepare_tria_for_notching( tria_flat, notch );
-				 numEx::notch_body( tria_flat, notch );
+				  numEx::prepare_tria_for_notching( tria_flat, notch_list[0] );
+				 numEx::notch_body( tria_flat, notch_list[0] );
 				 
-				 const Point<2> cyl_center_2D ( notch.cyl_center[0], notch.cyl_center[1] );
+				 const Point<2> cyl_center_2D ( notch_list[0].cyl_center[0], notch_list[0].cyl_center[1] );
 				 
 				 // The manifolds are only usable for the 2D mesh not for 3D
 				  SphericalManifold<2> spherical_manifold ( cyl_center_2D );
-				  tria_flat.set_manifold( manifold_id_notch_left, spherical_manifold );
+				  tria_flat.set_manifold( manifold_id_notch_right, spherical_manifold );
+
+				  if ( notch_twice )
+				  {
+					  numEx::prepare_tria_for_notching( tria_flat, notch_list[1] );
+					 numEx::notch_body( tria_flat, notch_list[1] );
+
+					 const Point<2> cyl_center_2D ( notch_list[1].cyl_center[0], notch_list[1].cyl_center[1] );
+
+					 // The manifolds are only usable for the 2D mesh not for 3D
+					  SphericalManifold<2> spherical_manifold ( cyl_center_2D );
+					  tria_flat.set_manifold( manifold_id_notch_left, spherical_manifold );
+				  }
 			 }
 //			 else
 //			 {
@@ -295,22 +306,67 @@ namespace HyperRectangle
 		 body_dimensions[enums::x] = width;
 		 const double length = parameter.height;
 		 body_dimensions[enums::y] = length;
-		
-		const unsigned int n_elements_in_x_for_coarse_mesh = parameter.grid_y_repetitions;
-		const double notch_reduction = parameter.ratio_x;
-		 Point<3> notch_reference_point ( width, width, 0);
-		 Point<3> face_normal(1.,0,0);
-		Point<3> axis_dir (0,0,1);
 
-		 double notch_depth = (1.-notch_reduction)*width;
-		 
-		 // notching
-		 numEx::NotchClass<2> notch ( enums::notch_round, parameter.notchWidth, notch_depth, notch_reference_point, enums::id_boundary_xPlus,
-										face_normal, enums::y, manifold_id_notch_left );
-		 
-		make_grid_flat( triangulation, length, width, notch,
-						n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements );
-			
+		 const double notch_y_right = length/2.+width/2.;
+		 const double notch_y_left = length/2.-width/2.;
+
+		// notching
+		 // First notch on the right
+		  const unsigned int n_elements_in_x_for_coarse_mesh = parameter.grid_y_repetitions;
+		  const double notch_reduction = parameter.ratio_x;
+		  Point<3> notch_reference_point1 ( width, notch_y_right, 0);
+		  Point<3> face_normal1(1.,0,0);
+		  double notch_depth = (1.-notch_reduction)*width;
+
+		  numEx::NotchClass<2> notch1 ( enums::notch_round, parameter.notchWidth, notch_depth, notch_reference_point1, enums::id_boundary_xPlus,
+										face_normal1, enums::y, manifold_id_notch_right );
+
+		 // Second notch on the left
+		  Point<3> notch_reference_point2 ( 0, notch_y_left, 0);
+		  Point<3> face_normal2(-1.,0,0);
+
+		  numEx::NotchClass<2> notch2 ( enums::notch_round, parameter.notchWidth, notch_depth, notch_reference_point2, enums::id_boundary_xMinus,
+										face_normal2, enums::y, manifold_id_notch_left );
+
+		// Create the 2D base mesh
+		 if ( notch_twice )
+			make_grid_flat( triangulation, length, width, {notch1,notch2},
+							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements );
+		 else
+			make_grid_flat( triangulation, length, width, {notch1},
+							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements );
+
+		// Local refinements
+		 if ( notch_twice )
+		 {
+			 for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
+			 {
+				for (typename Triangulation<dim>::active_cell_iterator
+							 cell = triangulation.begin_active();
+							 cell != triangulation.end(); ++cell)
+				{
+						// Find all cells that lay in an exemplary damage band with size 1/4 from the y=0 face
+						if ( std::abs( cell->center()[enums::y] - ( cell->center()[enums::x] + notch_y_left ) ) < 1.5*parameter.notchWidth/2. )
+							cell->set_refine_flag();
+				} // end for(cell)
+				triangulation.execute_coarsening_and_refinement();
+			 }
+		 }
+		 else
+		 {
+//			 for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
+//			 {
+//				for (typename Triangulation<dim>::active_cell_iterator
+//							 cell = triangulation.begin_active();
+//							 cell != triangulation.end(); ++cell)
+//				{
+//						// Find all cells that lay in an exemplary damage band with size 1/4 from the y=0 face
+//						if ( std::abs( cell->center()[enums::y] -  < length_refined )
+//							cell->set_refine_flag();
+//				} // end for(cell)
+//				triangulation.execute_coarsening_and_refinement();
+//			 }
+		}
 	}
 	
 
@@ -342,7 +398,7 @@ namespace HyperRectangle
 										face_normal, enums::y, manifold_id_notch_left );
 		 
 		Triangulation<2> tria_flat;
-		make_grid_flat( tria_flat, length, width, notch,
+		make_grid_flat( tria_flat, length, width, {notch},
 						n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements );
 		
 		GridGenerator::extrude_triangulation( tria_flat, parameter.nbr_elementsInZ, parameter.thickness, triangulation, true );
