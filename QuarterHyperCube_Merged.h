@@ -499,7 +499,7 @@ namespace QuarterHyperCube_Merged
 				{
 					for ( unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; face++ )
 					{
-						if ( cell->center()[enums::y] < width*0.75/(std::pow(double(refine_counter),refine_local_gradation)+1.) )
+						if ( cell->center()[enums::y] < 30 ) //width*0.75/(std::pow(double(refine_counter),refine_local_gradation)+1.) )
 						{
 							//cell->set_refine_flag();
 							cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the y-direction
