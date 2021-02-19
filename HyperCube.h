@@ -26,6 +26,7 @@ namespace HyperCube
 /*
  * A single (or multiple) element(s) with three symmetry constraints, loaded in y-direction, dimensions widthxdim
  * By selecting 1 global refinement and distortion we can create the distorted patch element test in 2D or 3D
+ * @todo The refine special enums need to be local values for each numEx
  *
  * CERTIFIED TO STANDARD numExS11 (210104)
  */
@@ -39,7 +40,7 @@ namespace HyperCube
 	// The loading direction: \n
 	// In which coordinate direction the load shall be applied, so x/y/z. We assume the positive axis direction, where
 	// changes in the direction (+ -) are possible with positive and negative loads.
-	 const unsigned int loading_direction = enums::y;
+	 const unsigned int loading_direction = enums::y; // standard
 
 	// The loaded faces:
 	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus;
@@ -102,17 +103,23 @@ namespace HyperCube
 	{
 		// BC on x0 plane
 		 numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-		 
+
 		// BC on y0 plane
 		 numEx::BC_apply( enums::id_boundary_yMinus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-		 
+
 		// BC on z0 plane ...
 		 if ( dim==3 ) // ... only for 3D
 			numEx::BC_apply( enums::id_boundary_zMinus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-		 
+
+//		// Fix the bottom face
+//		 numEx::BC_apply_fix( enums::id_boundary_yMinus, dof_handler_ref, fe, constraints );
+
 		// BC for the load ...
 		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver, alternatively  ...
+		 {
 			numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+			//numEx::BC_apply( id_boundary_secondaryLoad, enums::x, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		 }
 		 else if ( parameter.driver == enums::Contact ) // ... as contact
 		 {
 			if (apply_dirichlet_bc == true )
@@ -143,7 +150,7 @@ namespace HyperCube
 		 eval_path_start = eval_point;
 
 		// Create the triangulation
-		 GridGenerator::hyper_cube(triangulation);
+		 GridGenerator::hyper_cube(triangulation,0,width);
 
 		// Clear all existing boundary ID's
 		 numEx::clear_boundary_IDs( triangulation );
@@ -222,7 +229,7 @@ namespace HyperCube
 		{
 			if ( dim==3 )
 			{
-				// Single distored element
+				// Single distorted element
 				if ( triangulation.n_active_cells()==1 )
 				{
 					std::vector< Point<dim> > points_xyz (2);
