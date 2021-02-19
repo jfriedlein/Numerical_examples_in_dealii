@@ -36,7 +36,7 @@ namespace Rod
 	 const enums::enum_notch_type notch_type = enums::notch_linear;
 
 	// BC
-//	 const enums::enum_BC BC_yPlus  = enums::BC_x0_z0; // special: not contraction of loaded face
+//	 const enums::enum_BC BC_yPlus  = enums::BC_x0_z0; // special: no contraction of loaded face
 	 const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard
 
 	// Some internal parameters
@@ -47,224 +47,16 @@ namespace Rod
 		const double search_tolerance = 1e-12;
 	 };
 
-
-// 3d grid
-	/*
-	 * @param triangulation
-	 * @param length_of_the_entireRod The length of the entire rod
-	 * @param radius_of_the_entireRod The outer radius of the rod
-	 * @param length_of_the_entireNotchedArea The length of the notch in y-direction. We only model 1/8 of the entire bar, hence only 1/2 of the notch length
-	 *
-	 * @todo Add the remaining parameters with description
-	 */
-	template <int dim>
-	void make_grid (
-						Triangulation<3> &triangulation,
-						const double &length_of_the_entireRod,
-						const double &radius_of_the_entireRod,
-						const double &length_of_the_entireNotchedArea,
-						const double &radius_reductionFactor_in_notchedArea,
-						const unsigned int n_additonal_refinements_in_y=1,
-						const unsigned int n_global_refinements=0,
-						const int n_max_of_elements_in_the_coarse_area = 6
-				   )
-
-	{
-		// parameterCollection that contains the boundary ids
-		 parameterCollection parameters_internal;
-
-		const double search_tolerance = parameters_internal.search_tolerance;
-
-		const double half_length = length_of_the_entireRod/2.;
-		const double radius = radius_of_the_entireRod;
-		const double half_notch_length = length_of_the_entireNotchedArea/2.;
-		const double notch_radius = radius_reductionFactor_in_notchedArea * radius;
-		const unsigned int n_additional_refinements = n_additonal_refinements_in_y;
-
-		// The radius of the notch, e.g. the tool radius that was used to create the notch from the outside
-		 const double R = ( half_notch_length*half_notch_length + (radius - notch_radius)*(radius - notch_radius) )
-					      / ( 2.*(radius - notch_radius) );
-
-		enum enum_coord_directions
-		{
-			x = 0, y = 1, z = 2
-		};
-
-		Assert(n_additional_refinements>0, ExcMessage("Rod<< Mesh not implemented for only 4 elements in total. Please increase the nbr_holeEdge_refinements to at least 1."));
-
-		// Create in a first step the triangulation representing 1/8 of a cylinder
-		 {
-			// First we create a cylinder
-			 Triangulation<dim> tria_full_cylinder;
-			 GridGenerator::cylinder(tria_full_cylinder, radius, half_length);
-
-			// Let's first refine the "cylinder" ones, because the initial mesh is a brick
-			 tria_full_cylinder.refine_global( 1 );
-
-			// We rotate the cylinder (oriented along x-axis by default) by 90° (=std::atan(1)*2 rad) around the z-axis
-			 GridTools::rotate( std::atan(1)*2, z, tria_full_cylinder);
-
-			// We only model 1/8 of the entire rod, hence we remove everything else
-			 std::set<typename Triangulation<dim>::active_cell_iterator > cells_to_remove;
-			 for (typename Triangulation<dim>::active_cell_iterator
-				 cell = tria_full_cylinder.begin_active();
-				 cell != tria_full_cylinder.end(); ++cell)
-			 {
-				// Remove all cells that are not in the first quadrant.
-				// The 1/8 shall reside in the positive x,y,z quadrant
-				if (cell->center()[x] < 0.0 || cell->center()[y] < 0.0 || cell->center()[z] < 0.0 )
-					cells_to_remove.insert(cell);
-			 }
-			 Assert(cells_to_remove.size() > 0, ExcInternalError());
-			 Assert(cells_to_remove.size() != tria_full_cylinder.n_active_cells(), ExcInternalError());
-			 GridGenerator::create_triangulation_with_removed_cells(tria_full_cylinder,cells_to_remove,triangulation);
-		 }
-
-		// Clear boundary ID's
-		 for (typename Triangulation<dim>::active_cell_iterator
-			 cell = triangulation.begin_active();
-			 cell != triangulation.end(); ++cell)
-		 {
-			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-			  if (cell->face(face)->at_boundary())
-				  cell->face(face)->set_all_boundary_ids(0);
-		 }
-
-		// Set boundary IDs and and manifolds
-		 for (typename Triangulation<dim>::active_cell_iterator
-			 cell = triangulation.begin_active();
-			 cell != triangulation.end(); ++cell)
-		 {
-			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-			 // Cells that describe the boundary can only describe the boundary when they possess a face that lies at the boundary:
-			  if (cell->face(face)->at_boundary())
-			  {
-				// Cell at the x0-plane
-				 if (std::abs(cell->face(face)->center()[x] - 0.0) < search_tolerance)
-					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
-				// Cell at the y0-plane
-				 else if (std::abs(cell->face(face)->center()[y] - 0.0) < search_tolerance)
-						cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
-				// Cell at the z0-plane
-				 else if (std::abs(cell->face(face)->center()[z] - 0.0) < search_tolerance)
-						cell->face(face)->set_boundary_id(enums::id_boundary_zMinus);
-				// Cell at the other end of the rod
-				 else if (std::abs(cell->face(face)->center()[y] - half_length) < search_tolerance)
-						cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
-			  }
-		 }
-
-		// Attach a manifold to the curved boundary
-		// @note We can only guarantee that the vertices sit on the curve, so we must test with their position instead of the cell centre.
-		for (typename Triangulation<dim>::active_cell_iterator
-		   cell = triangulation.begin_active();
-		   cell != triangulation.end(); ++cell)
-		{
-		  for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-			if (cell->face(face)->at_boundary())
-			  for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
-			  {
-				 // Compute the projected radius in the xz-plane, so the distance between the vertex and the y-axis
-				  double distance_2d_xz = std::sqrt( cell->vertex(vertex)[x]*cell->vertex(vertex)[x] + cell->vertex(vertex)[z]*cell->vertex(vertex)[z] );
-				 if ( std::abs(distance_2d_xz - radius) < search_tolerance )
-				 {
-					// This vertex lies on the outer surface, hence the face belongs to the manifold
-					// @note For some reason it is essential to use \a set_all_manifold_ids() instead of just set_manifold_id
-					cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_surf);
-					break;
-				 }
-			  }
-		}
-
-		// Create a cylindrical manifold to be put on the outer cylindrical surface
-		 CylindricalManifold<dim> cylindrical_manifold_3d (y); // y-axis
-		 triangulation.set_manifold( parameters_internal.manifold_id_surf, cylindrical_manifold_3d );
-
-		// Global refinement of the mesh to get a better approximation of the contour:\n
-		// Previous: 2 elements for quarter arc; After global refinement: 4 elements
-		 triangulation.refine_global( 1 );
-
-		// Add some local refinements:
-		// Cells are cut in y-direction, so we simple get some more cells that will be rearranged subsequently
-		// @note For some reason I cannot cut_y two cells that lie next to each other. Hence, I only refine the cell at the y0-plane
-		 for (unsigned int refine_counter=0; refine_counter < n_additional_refinements; refine_counter++)
-		 {
-			for (typename Triangulation<dim>::active_cell_iterator
-			   cell = triangulation.begin_active();
-			   cell != triangulation.end(); ++cell)
-			{
-				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-					if (cell->face(face)->at_boundary())
-						if ( std::abs(cell->face(face)->center()[y])<search_tolerance )
-						{
-							cell->set_refine_flag(RefinementCase<dim>::cut_y); // refine only in the y-direction
-							break;
-						}
-			}
-			triangulation.execute_coarsening_and_refinement();
-		 }
-
-	  // Shift the refinement layers in y-direction:
-	  // This is a bit tricky and can best be comprehended on paper for specific example values.
-		double initial_pos, new_pos;
-
-		const unsigned int nbr_of_y_cells = 4 + n_additional_refinements;
-		unsigned int nbr_of_coarse_y_cells = std::min(int(std::ceil(nbr_of_y_cells/2.)),n_max_of_elements_in_the_coarse_area);
-		const unsigned int nbr_of_fine_y_cells = nbr_of_y_cells - nbr_of_coarse_y_cells;
-
-		// Shift the coarsest cells such that the coarser outer area is uniformly discretised
-		 for ( unsigned int i=1; i<=3; i++ )
-		 {
-			initial_pos = half_length * (4-i)/4.;
-			new_pos = (nbr_of_coarse_y_cells - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
-			numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
-		 }
-
-		// We have to grab a few more cells from the local refinements in case we want more than 9 cells in y-direction
-		 if ( nbr_of_coarse_y_cells>4 )
-			for ( unsigned int i=3; i<=(nbr_of_coarse_y_cells-2); i++ )
-			{
-				initial_pos = half_length * 1./(std::pow(2,i));
-				new_pos = (nbr_of_coarse_y_cells-1 - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
-				numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
-			}
-
-		// A small trick to get this general framework to operate even for the two lowest refinements 1 and 2
-		 if ( n_additional_refinements <= 2 )
-			 nbr_of_coarse_y_cells = 4;
-
-		// Now we are down to the notch length
-		 for ( unsigned int i=(nbr_of_coarse_y_cells-1); i<=(n_additional_refinements+2); i++ )
-		 {
-			initial_pos = half_length * 1./(std::pow(2,i));
-			new_pos = (nbr_of_y_cells-1 - i)/double(nbr_of_fine_y_cells)  * half_notch_length;
-			numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
-		 }
-
-	    // Generate the notch
-		 numEx::notch_body( triangulation, half_notch_length, radius, notch_radius, R, notch_type, true );
-
-		// Possibly some additional global isotropic refinements
-		 triangulation.refine_global(n_global_refinements);	// ... Parameter.prm file
-
-//		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-//		{
-//			std::ofstream out ("grid-3d_quarter_plate_merged.eps");
-//			GridOut grid_out;
-//			grid_out.write_eps (triangulation, out);
-//			std::cout << "Grid written to grid-3d_quarter_plate_merged.eps" << std::endl;
-//		}
-//		{
-//			std::ofstream out_ucd("Grid-3d_quarter_plate_merged.inp");
-//			GridOut grid_out;
-//			GridOutFlags::Ucd ucd_flags(true,true,true);
-//			grid_out.set_flags(ucd_flags);
-//			grid_out.write_ucd(triangulation, out_ucd);
-//			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
-//		}
-	}
+	// Evaluation points: \n
+	// We want to points, one for the contraction of the center
+	// and one for the contraction of the top face.
+	// We don't know the coordinates yet, because the mesh has not yet been created.
+	// So we fill the data in make_grid.
+	// @todo We need \a dim here instead of 3, but dim is unkown at this place -> redesign
+	 std::vector< numEx::EvalPointClass<3> > eval_points_list (2, numEx::EvalPointClass<3>() );
 
 
+	// 3D
 	template <int dim>
 	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
 
@@ -466,10 +258,24 @@ namespace Rod
 			// Previous: 2 elements for quarter arc; After global refinement: 4 elements
 			 triangulation.refine_global( 1 );
 
+//				for (typename Triangulation<dim>::active_cell_iterator
+//				   cell = triangulation.begin_active();
+//				   cell != triangulation.end(); ++cell)
+//				{
+//					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+//						if (cell->face(face)->at_boundary())
+//							if ( std::abs(cell->face(face)->center()[y])<search_tolerance )
+//							{
+//								cell->set_refine_flag();
+//								break;
+//							}
+//				}
+//				triangulation.execute_coarsening_and_refinement();
+
 			// Add some local refinements:
 			// Cells are cut in y-direction, so we simple get some more cells that will be rearranged subsequently
 			// @note For some reason I cannot cut_y two cells that lie next to each other. Hence, I only refine the cell at the y0-plane
-			 for (unsigned int refine_counter=0; refine_counter < 4; refine_counter++)
+			 for (unsigned int refine_counter=0; refine_counter < n_additional_refinements; refine_counter++)
 			 {
 				for (typename Triangulation<dim>::active_cell_iterator
 				   cell = triangulation.begin_active();
@@ -486,6 +292,72 @@ namespace Rod
 				triangulation.execute_coarsening_and_refinement();
 			 }
 		}
+//		else if ( parameter.refine_special == enums::Mesh_refine_y )
+//		{
+//			// Global refinement of the mesh to get a better approximation of the contour:\n
+//			// Previous: 2 elements for quarter arc; After global refinement: 4 elements
+//			 triangulation.refine_global( 1 );
+//
+//			// Add some local refinements:
+//			// Cells are cut in y-direction, so we simple get some more cells that will be rearranged subsequently
+//			// @note For some reason I cannot cut_y two cells that lie next to each other. Hence, I only refine the cell at the y0-plane
+//			 for (unsigned int refine_counter=0; refine_counter < n_additional_refinements; refine_counter++)
+//			 {
+//				for (typename Triangulation<dim>::active_cell_iterator
+//				   cell = triangulation.begin_active();
+//				   cell != triangulation.end(); ++cell)
+//				{
+//					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+//						if (cell->face(face)->at_boundary())
+//							if ( std::abs(cell->face(face)->center()[y])<search_tolerance )
+//							{
+//								cell->set_refine_flag(RefinementCase<dim>::cut_y); // refine only in the y-direction
+//								break;
+//							}
+//				}
+//				triangulation.execute_coarsening_and_refinement();
+//			 }
+//
+//		  // Shift the refinement layers in y-direction:
+//		  // This is a bit tricky and can best be comprehended on paper for specific example values.
+//			double initial_pos, new_pos;
+//
+//			const unsigned int nbr_of_y_cells = 4 + n_additional_refinements;
+//			unsigned int nbr_of_coarse_y_cells = std::min(int(std::ceil(nbr_of_y_cells/2.)),n_max_of_elements_in_the_coarse_area);
+//			const unsigned int nbr_of_fine_y_cells = nbr_of_y_cells - nbr_of_coarse_y_cells;
+//
+//			// Shift the coarsest cells such that the coarser outer area is uniformly discretised
+//			 for ( unsigned int i=1; i<=3; i++ )
+//			 {
+//				initial_pos = half_length * (4-i)/4.;
+//				new_pos = (nbr_of_coarse_y_cells - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
+//				numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+//			 }
+//
+//			// We have to grab a few more cells from the local refinements in case we want more than 9 cells in y-direction
+//			 if ( nbr_of_coarse_y_cells>4 )
+//				for ( unsigned int i=3; i<=(nbr_of_coarse_y_cells-2); i++ )
+//				{
+//					initial_pos = half_length * 1./(std::pow(2,i));
+//					new_pos = (nbr_of_coarse_y_cells-1 - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
+//					numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+//				}
+//
+//			// A small trick to get this general framework to operate even for the two lowest refinements 1 and 2
+//			 if ( n_additional_refinements <= 2 )
+//				 nbr_of_coarse_y_cells = 4;
+//
+//			// Now we are down to the notch length
+//			 for ( unsigned int i=(nbr_of_coarse_y_cells-1); i<=(n_additional_refinements+2); i++ )
+//			 {
+//				initial_pos = half_length * 1./(std::pow(2,i));
+//				new_pos = (nbr_of_y_cells-1 - i)/double(nbr_of_fine_y_cells)  * half_notch_length;
+//				numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+//			 }
+//
+//			// We store the size of the innermost cell from the last new_pos
+//			 cell_size_innermost = new_pos;
+//		}
 
 		// Possibly some additional global isotropic refinements
 		// @todo-assure: We shifted these global refinements before the special innermost refinements, so
@@ -539,6 +411,12 @@ namespace Rod
 //			grid_out.write_ucd(triangulation, out_ucd);
 //			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
 //		}
+
+		// Evaluation points and the related list of them
+		 numEx::EvalPointClass<dim> eval_center ( Point<3>(notch_radius,0,0), enums::x );
+		 numEx::EvalPointClass<dim> eval_top ( Point<3>(radius,half_length,0), enums::x );
+
+		 eval_points_list = {eval_center,eval_top};
 	}
 	
 	
@@ -704,6 +582,12 @@ namespace Rod
 		// Possibly some additional global isotropic refinements
 		 triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
+		// Evaluation points and the related list of them
+		 numEx::EvalPointClass<3> eval_center ( Point<3>(notch_radius,0,0), enums::x );
+		 numEx::EvalPointClass<3> eval_top ( Point<3>(radius,half_length,0), enums::x );
+
+		 eval_points_list = {eval_center,eval_top};
+
 		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
 //		{
 //			std::ofstream out ("grid-3d_quarter_plate_merged.eps");
@@ -724,134 +608,245 @@ namespace Rod
 
 
 	template<int dim>
-		void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
-								const bool &apply_dirichlet_bc, double &current_load_increment,
-								const Parameter::GeneralParameters &parameter)
+	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
+							const bool &apply_dirichlet_bc, double &current_load_increment,
+							const Parameter::GeneralParameters &parameter)
+	{
+		// BC on x0 plane
+		 numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+
+		// BC on y0 plane
+		 numEx::BC_apply( enums::id_boundary_yMinus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+
+		// BC on z0 plane
+		 if ( dim==3 )
+			numEx::BC_apply( enums::id_boundary_zMinus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+
+		// BC for the yPlus
+		 if ( BC_yPlus==enums::BC_x0_z0 ) // no contraction
+		 {
+			numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+			numEx::BC_apply( enums::id_boundary_yPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		 }
+
+		// BC for the load ...
+		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver
+			numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+	}
+
+	// 3d grid
+	/*
+	 * @param triangulation
+	 * @param length_of_the_entireRod The length of the entire rod
+	 * @param radius_of_the_entireRod The outer radius of the rod
+	 * @param length_of_the_entireNotchedArea The length of the notch in y-direction. We only model 1/8 of the entire bar, hence only 1/2 of the notch length
+	 *
+	 * @todo Add the remaining parameters with description
+	 */
+	template <int dim>
+	void make_grid (
+						Triangulation<3> &triangulation,
+						const double &length_of_the_entireRod,
+						const double &radius_of_the_entireRod,
+						const double &length_of_the_entireNotchedArea,
+						const double &radius_reductionFactor_in_notchedArea,
+						const unsigned int n_additonal_refinements_in_y=1,
+						const unsigned int n_global_refinements=0,
+						const int n_max_of_elements_in_the_coarse_area = 6
+				   )
+
+	{
+		// parameterCollection that contains the boundary ids
+		 parameterCollection parameters_internal;
+
+		const double search_tolerance = parameters_internal.search_tolerance;
+
+		const double half_length = length_of_the_entireRod/2.;
+		const double radius = radius_of_the_entireRod;
+		const double half_notch_length = length_of_the_entireNotchedArea/2.;
+		const double notch_radius = radius_reductionFactor_in_notchedArea * radius;
+		const unsigned int n_additional_refinements = n_additonal_refinements_in_y;
+
+		// The radius of the notch, e.g. the tool radius that was used to create the notch from the outside
+		 const double R = ( half_notch_length*half_notch_length + (radius - notch_radius)*(radius - notch_radius) )
+						  / ( 2.*(radius - notch_radius) );
+
+		enum enum_coord_directions
 		{
-			/* inputs:
-			 * dof_handler_ref,
-			 * fe
-			 * apply_dirichlet_bc
-			 * constraints
-			 * current_load_increment
-			 */
+			x = 0, y = 1, z = 2
+		};
 
-			// Symmetry constraints:
-			// Update and apply new constraints
-			//		on x0_plane for symmetry (displacement_in_x = 0)
-			//		on y0_plane for symmetry (displacement_in_y = 0)
-			//		on z0_plane for symmetry (displacement_in_z = 0)
+		Assert(n_additional_refinements>0, ExcMessage("Rod<< Mesh not implemented for only 4 elements in total. Please increase the nbr_holeEdge_refinements to at least 1."));
 
-			parameterCollection parameters_internal;
+		// Create in a first step the triangulation representing 1/8 of a cylinder
+		 {
+			// First we create a cylinder
+			 Triangulation<dim> tria_full_cylinder;
+			 GridGenerator::cylinder(tria_full_cylinder, radius, half_length);
 
-			const FEValuesExtractors::Vector displacement(0);
-			const FEValuesExtractors::Scalar x_displacement(0);
-			const FEValuesExtractors::Scalar y_displacement(1);
+			// Let's first refine the "cylinder" ones, because the initial mesh is a brick
+			 tria_full_cylinder.refine_global( 1 );
 
-			// on X0 plane
-			//if ( dim==3 ) // only for 3D?
-			{
-				if (apply_dirichlet_bc == true )
-				{
-					VectorTools::interpolate_boundary_values(
-																dof_handler_ref,
-																enums::id_boundary_xMinus,
-																ZeroFunction<dim> (n_components),
-																constraints,
-																fe.component_mask(x_displacement)
-															);
-				}
-				else	// in the exact same manner
-				{
-					VectorTools::interpolate_boundary_values(
-																dof_handler_ref,
-																enums::id_boundary_xMinus,
-																ZeroFunction<dim> (n_components),
-																constraints,
-																fe.component_mask(x_displacement)
-															);
-				}
-			}
+			// We rotate the cylinder (oriented along x-axis by default) by 90° (=std::atan(1)*2 rad) around the z-axis
+			 GridTools::rotate( std::atan(1.)*2., z, tria_full_cylinder);
 
-			// on Y0 edge
-			if (apply_dirichlet_bc == true )
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_yMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(y_displacement)
-														);
-			}
-			else	// in the exact same manner
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_yMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(y_displacement)
-														);
-			}
-
-			// on Z0 plane
-			if ( dim==3 )
-			{
-				const FEValuesExtractors::Scalar z_displacement(2);
-
-				if (apply_dirichlet_bc == true )
-				{
-					VectorTools::interpolate_boundary_values(
-																dof_handler_ref,
-																enums::id_boundary_zMinus,
-																ZeroFunction<dim> (n_components),
-																constraints,
-																fe.component_mask(z_displacement)
-															);
-				}
-				else	// in the exact same manner
-				{
-					VectorTools::interpolate_boundary_values(
-																dof_handler_ref,
-																enums::id_boundary_zMinus,
-																ZeroFunction<dim> (n_components),
-																constraints,
-																fe.component_mask(z_displacement)
-															);
-				}
-			}
-
-			// BC for the yPlus
-			 if ( BC_yPlus==enums::BC_x0_z0 )
+			// We only model 1/8 of the entire rod, hence we remove everything else
+			 std::set<typename Triangulation<dim>::active_cell_iterator > cells_to_remove;
+			 for (typename Triangulation<dim>::active_cell_iterator
+				 cell = tria_full_cylinder.begin_active();
+				 cell != tria_full_cylinder.end(); ++cell)
 			 {
-				numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-				numEx::BC_apply( enums::id_boundary_yPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+				// Remove all cells that are not in the first quadrant.
+				// The 1/8 shall reside in the positive x,y,z quadrant
+				if (cell->center()[x] < 0.0 || cell->center()[y] < 0.0 || cell->center()[z] < 0.0 )
+					cells_to_remove.insert(cell);
 			 }
+			 Assert(cells_to_remove.size() > 0, ExcInternalError());
+			 Assert(cells_to_remove.size() != tria_full_cylinder.n_active_cells(), ExcInternalError());
+			 GridGenerator::create_triangulation_with_removed_cells(tria_full_cylinder,cells_to_remove,triangulation);
+		 }
 
-			if ( parameter.driver == enums::Dirichlet )
-			{
-				// on top edge
-				if (apply_dirichlet_bc == true )
-				{
-					VectorTools::interpolate_boundary_values(
-																dof_handler_ref,
-																id_boundary_load,
-																ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
-																constraints,
-																fe.component_mask(y_displacement)
-															);
-				}
-				else
-				{
-					VectorTools::interpolate_boundary_values(
-																dof_handler_ref,
-																id_boundary_load,
-																ZeroFunction<dim> (n_components),
-																constraints,
-																fe.component_mask(y_displacement)
-															);
-				}
-			}
+		// Clear boundary ID's
+		 for (typename Triangulation<dim>::active_cell_iterator
+			 cell = triangulation.begin_active();
+			 cell != triangulation.end(); ++cell)
+		 {
+			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+			  if (cell->face(face)->at_boundary())
+				  cell->face(face)->set_all_boundary_ids(0);
+		 }
+
+		// Set boundary IDs and and manifolds
+		 for (typename Triangulation<dim>::active_cell_iterator
+			 cell = triangulation.begin_active();
+			 cell != triangulation.end(); ++cell)
+		 {
+			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+			 // Cells that describe the boundary can only describe the boundary when they possess a face that lies at the boundary:
+			  if (cell->face(face)->at_boundary())
+			  {
+				// Cell at the x0-plane
+				 if (std::abs(cell->face(face)->center()[x] - 0.0) < search_tolerance)
+					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
+				// Cell at the y0-plane
+				 else if (std::abs(cell->face(face)->center()[y] - 0.0) < search_tolerance)
+						cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
+				// Cell at the z0-plane
+				 else if (std::abs(cell->face(face)->center()[z] - 0.0) < search_tolerance)
+						cell->face(face)->set_boundary_id(enums::id_boundary_zMinus);
+				// Cell at the other end of the rod
+				 else if (std::abs(cell->face(face)->center()[y] - half_length) < search_tolerance)
+						cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
+			  }
+		 }
+
+		// Attach a manifold to the curved boundary
+		// @note We can only guarantee that the vertices sit on the curve, so we must test with their position instead of the cell centre.
+		for (typename Triangulation<dim>::active_cell_iterator
+		   cell = triangulation.begin_active();
+		   cell != triangulation.end(); ++cell)
+		{
+		  for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+			if (cell->face(face)->at_boundary())
+			  for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
+			  {
+				 // Compute the projected radius in the xz-plane, so the distance between the vertex and the y-axis
+				  double distance_2d_xz = std::sqrt( cell->vertex(vertex)[x]*cell->vertex(vertex)[x] + cell->vertex(vertex)[z]*cell->vertex(vertex)[z] );
+				 if ( std::abs(distance_2d_xz - radius) < search_tolerance )
+				 {
+					// This vertex lies on the outer surface, hence the face belongs to the manifold
+					// @note For some reason it is essential to use \a set_all_manifold_ids() instead of just set_manifold_id
+					cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_surf);
+					break;
+				 }
+			  }
 		}
+
+		// Create a cylindrical manifold to be put on the outer cylindrical surface
+		 CylindricalManifold<dim> cylindrical_manifold_3d (y); // y-axis
+		 triangulation.set_manifold( parameters_internal.manifold_id_surf, cylindrical_manifold_3d );
+
+		// Global refinement of the mesh to get a better approximation of the contour:\n
+		// Previous: 2 elements for quarter arc; After global refinement: 4 elements
+		 triangulation.refine_global( 1 );
+
+		// Add some local refinements:
+		// Cells are cut in y-direction, so we simple get some more cells that will be rearranged subsequently
+		// @note For some reason I cannot cut_y two cells that lie next to each other. Hence, I only refine the cell at the y0-plane
+		 for (unsigned int refine_counter=0; refine_counter < n_additional_refinements; refine_counter++)
+		 {
+			for (typename Triangulation<dim>::active_cell_iterator
+			   cell = triangulation.begin_active();
+			   cell != triangulation.end(); ++cell)
+			{
+				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+					if (cell->face(face)->at_boundary())
+						if ( std::abs(cell->face(face)->center()[y])<search_tolerance )
+						{
+							cell->set_refine_flag(RefinementCase<dim>::cut_y); // refine only in the y-direction
+							break;
+						}
+			}
+			triangulation.execute_coarsening_and_refinement();
+		 }
+
+	  // Shift the refinement layers in y-direction:
+	  // This is a bit tricky and can best be comprehended on paper for specific example values.
+		double initial_pos, new_pos;
+
+		const unsigned int nbr_of_y_cells = 4 + n_additional_refinements;
+		unsigned int nbr_of_coarse_y_cells = std::min(int(std::ceil(nbr_of_y_cells/2.)),n_max_of_elements_in_the_coarse_area);
+		const unsigned int nbr_of_fine_y_cells = nbr_of_y_cells - nbr_of_coarse_y_cells;
+
+		// Shift the coarsest cells such that the coarser outer area is uniformly discretised
+		 for ( unsigned int i=1; i<=3; i++ )
+		 {
+			initial_pos = half_length * (4-i)/4.;
+			new_pos = (nbr_of_coarse_y_cells - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
+			numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+		 }
+
+		// We have to grab a few more cells from the local refinements in case we want more than 9 cells in y-direction
+		 if ( nbr_of_coarse_y_cells>4 )
+			for ( unsigned int i=3; i<=(nbr_of_coarse_y_cells-2); i++ )
+			{
+				initial_pos = half_length * 1./(std::pow(2,i));
+				new_pos = (nbr_of_coarse_y_cells-1 - i)/double(nbr_of_coarse_y_cells) * (half_length - half_notch_length) + half_notch_length;
+				numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+			}
+
+		// A small trick to get this general framework to operate even for the two lowest refinements 1 and 2
+		 if ( n_additional_refinements <= 2 )
+			 nbr_of_coarse_y_cells = 4;
+
+		// Now we are down to the notch length
+		 for ( unsigned int i=(nbr_of_coarse_y_cells-1); i<=(n_additional_refinements+2); i++ )
+		 {
+			initial_pos = half_length * 1./(std::pow(2,i));
+			new_pos = (nbr_of_y_cells-1 - i)/double(nbr_of_fine_y_cells)  * half_notch_length;
+			numEx::shift_vertex_layer( triangulation, initial_pos, new_pos, y );
+		 }
+
+		// Generate the notch
+		 numEx::notch_body( triangulation, half_notch_length, radius, notch_radius, R, notch_type, true );
+
+		// Possibly some additional global isotropic refinements
+		 triangulation.refine_global(n_global_refinements);	// ... Parameter.prm file
+
+	//		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
+	//		{
+	//			std::ofstream out ("grid-3d_quarter_plate_merged.eps");
+	//			GridOut grid_out;
+	//			grid_out.write_eps (triangulation, out);
+	//			std::cout << "Grid written to grid-3d_quarter_plate_merged.eps" << std::endl;
+	//		}
+	//		{
+	//			std::ofstream out_ucd("Grid-3d_quarter_plate_merged.inp");
+	//			GridOut grid_out;
+	//			GridOutFlags::Ucd ucd_flags(true,true,true);
+	//			grid_out.set_flags(ucd_flags);
+	//			grid_out.write_ucd(triangulation, out_ucd);
+	//			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
+	//		}
+	}
 }
