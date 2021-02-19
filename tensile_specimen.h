@@ -9,6 +9,11 @@
 #include <fstream>
 #include <cmath>
 
+
+// Numerical example helper function (required, can be downloaded from https://github.com/jfriedlein/Numerical_examples_in_dealii)
+// also contains enumerators as part of "enums::"
+#include "./numEx-helper_fnc.h"
+
 using namespace dealii;
 
 namespace tensileSpecimen
@@ -20,6 +25,10 @@ namespace tensileSpecimen
 	// The loaded faces:
 	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_xPlus;
 	 //const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_yPlus;
+
+	// Desired overall length
+	// @todo Currently hardcoded, should be a parameter
+	 const double desired_length = 70.;
 
 	// Some internal parameters
 	 struct parameterCollection
@@ -60,106 +69,25 @@ namespace tensileSpecimen
 		const FEValuesExtractors::Scalar y_displacement(1);
 
 		// on X0 plane
-		// like a symmetry constraint, because the left part is longer (continous on)
+		// like a symmetry constraint, because the left part is longer (continuous on)
 
-		if (apply_dirichlet_bc == true )
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-		}
-		else	// in the exact same manner
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_xMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(x_displacement)
-													);
-		}
+		// clamp the left face
+		 numEx::BC_apply_fix( enums::id_boundary_xMinus, dof_handler_ref, fe, constraints );
 
 		// on Y0 edge
 		// symmetry constraint (only 1/4 of the model is considered)
-
-		if (apply_dirichlet_bc == true )
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_yMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-		}
-		else	// in the exact same manner
-		{
-			VectorTools::interpolate_boundary_values(
-														dof_handler_ref,
-														enums::id_boundary_yMinus,
-														ZeroFunction<dim> (n_components),
-														constraints,
-														fe.component_mask(y_displacement)
-													);
-		}
+		 numEx::BC_apply( enums::id_boundary_yMinus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 		// on Z0 plane
 		// symmetry constraint in thickness direction
 		if ( dim==3 )
 		{
-			const FEValuesExtractors::Scalar z_displacement(2);
-
-			if (apply_dirichlet_bc == true )
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_zMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
-			else	// in the exact same manner
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															enums::id_boundary_zMinus,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(z_displacement)
-														);
-			}
+			 numEx::BC_apply( enums::id_boundary_zMinus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 		}
 
-		if ( parameter.driver == 2/*Dirichlet*/ ) // ToDo-optimize: use string in parameterfile denoting "Dirichlet" so the enumerator is not undermined
-		{
-			// on upper edge
-			// @todo Misses clamping, so probably no contraction in y and z, apply this constraint
-			if (apply_dirichlet_bc == true )
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															id_boundary_load,
-															ConstantFunction<dim> (current_load_increment/*add only the increment*/, n_components),
-															constraints,
-															fe.component_mask(x_displacement)
-														);
-			}
-			else
-			{
-				VectorTools::interpolate_boundary_values(
-															dof_handler_ref,
-															id_boundary_load,
-															ZeroFunction<dim> (n_components),
-															constraints,
-															fe.component_mask(x_displacement)
-														);
-			}
-		}
+		// BC for the load ...
+		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver
+			numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 	}
 
 
@@ -258,6 +186,19 @@ namespace tensileSpecimen
 						lower_radius_center
 					);
 
+				// Adapt the x-length of the radius to get the defined overall length
+				// We do this right here before we refine the mesh to avoid the distortion of inner cells,
+				// which don't exist before the following refine_global.
+				// The following is very simple, but
+				// @todo This only works for minor changes in the length, for larger we need the pad for \a plate_with_a_hole, or
+				// abort if the desired length gets to small
+				 {
+					double initial_pos = - transition_radius - hwidth_b - length_parallel/2.;
+					double new_pos = - desired_length/2.;
+
+					numEx::shift_vertex_layer( tria_plate_hole, initial_pos, new_pos, enums::x );
+				 }
+
 			   // Prerefine the plate
 			   // This is necessary at this very moment. When we later apply our own ids and manifolds and there is
 			   // only a single element between the outer straight edge of the plate and the hole edge, the cylindrical
@@ -286,43 +227,43 @@ namespace tensileSpecimen
 			// Adapt the width B (y-dimension) of the lower radial part
 			// By moving all the vertices that are too high (\a initial_pos) downwards to the new position \a new_pos that
 			// was defined as the width B.
+			 {
+				double initial_pos = hwidth_b + transition_radius;
+				double new_pos = hwidth_B;
+				const unsigned int direction = enums::y;
 				{
-					double initial_pos = hwidth_b + transition_radius;
-					double new_pos = hwidth_B;
-					const unsigned int direction = enums::y;
+					bool shifted_node = false;
+					for (typename Triangulation<2>::active_cell_iterator
+					   cell = tria_quarter_plate_hole_lower.begin_active();
+					   cell != tria_quarter_plate_hole_lower.end(); ++cell)
 					{
-						bool shifted_node = false;
-						for (typename Triangulation<2>::active_cell_iterator
-						   cell = tria_quarter_plate_hole_lower.begin_active();
-						   cell != tria_quarter_plate_hole_lower.end(); ++cell)
-						{
-						  for (unsigned int vertex=0; vertex<GeometryInfo<2>::vertices_per_cell; ++vertex )
+					  for (unsigned int vertex=0; vertex<GeometryInfo<2>::vertices_per_cell; ++vertex )
+					  {
+						  if ( std::abs( cell->vertex(vertex)[direction] - initial_pos) < 1e3 * search_tolerance /*requires this softer tolerance*/ )
 						  {
-							  if ( std::abs( cell->vertex(vertex)[direction] - initial_pos) < 1e3 * search_tolerance /*requires this softer tolerance*/ )
-							  {
-								  Point<2> shift_vector;
-								  // If this point is on the radius, we have to move it tangential (so down and to the RIGHT)
-								   if ( std::abs( cell->vertex(vertex).distance(lower_radius_center) - transition_radius) < 1e3 * search_tolerance )
-								   {
-									  shift_vector[enums::y] = - (hwidth_b + transition_radius - hwidth_B);
-									  shift_vector[enums::x] = transition_radius
-											                   - std::sqrt( transition_radius*transition_radius - shift_vector[enums::y]*shift_vector[enums::y] );
-								   }
-								  // If not, then we simply move it down by the y-difference
-								   else
-								   {
-									  shift_vector[direction] = (new_pos-initial_pos);
-								   }
-								  cell->vertex(vertex) += shift_vector;
-								  shifted_node = true; // -> We have shifted at least a single node
-							  }
+							  Point<2> shift_vector;
+							  // If this point is on the radius, we have to move it tangential (so down and to the RIGHT)
+							   if ( std::abs( cell->vertex(vertex).distance(lower_radius_center) - transition_radius) < 1e3 * search_tolerance )
+							   {
+								  shift_vector[enums::y] = - (hwidth_b + transition_radius - hwidth_B);
+								  shift_vector[enums::x] = transition_radius
+														   - std::sqrt( transition_radius*transition_radius - shift_vector[enums::y]*shift_vector[enums::y] );
+							   }
+							  // If not, then we simply move it down by the y-difference
+							   else
+							   {
+								  shift_vector[direction] = (new_pos-initial_pos);
+							   }
+							  cell->vertex(vertex) += shift_vector;
+							  shifted_node = true; // -> We have shifted at least a single node
 						  }
-						}
-						// Ensure that we shifted at least a single node
-						 AssertThrow( shifted_node==true,
-								      ExcMessage("tensileSpecimen<< You haven't moved a single node. Please check the selection criterion initial_pos."));
+					  }
 					}
+					// Ensure that we shifted at least a single node
+					 AssertThrow( shifted_node==true,
+								  ExcMessage("tensileSpecimen<< You haven't moved a single node. Please check the selection criterion initial_pos."));
 				}
+			 }
 		// ************************************************************************************************************
 
 
@@ -348,6 +289,16 @@ namespace tensileSpecimen
 					upper_radius_center
 				);
 
+			// Adapt the x-length of the radius to get the defined overall length
+			// We do this right here before we refine the mesh to avoid the distortion of inner cells,
+			// which don't exist before the following refine_global.
+			 {
+				double initial_pos = transition_radius + hwidth_b + length_parallel/2.;
+				double new_pos = desired_length/2.;
+
+				numEx::shift_vertex_layer( tria_plate_hole, initial_pos, new_pos, enums::x );
+			 }
+
 			tria_plate_hole.refine_global(1);
 
 			std::set<typename Triangulation<2>::active_cell_iterator > cells_to_remove;
@@ -365,7 +316,7 @@ namespace tensileSpecimen
 			GridGenerator::create_triangulation_with_removed_cells(tria_plate_hole,cells_to_remove,tria_quarter_plate_hole_upper);
 		 }
 
-		 // Adapt the width B of the lower radial part
+		 // Adapt the width B of the upper radial part
 		  {
 			double initial_pos = hwidth_b + transition_radius;
 			double new_pos = hwidth_B;
@@ -469,8 +420,10 @@ namespace tensileSpecimen
 		 upper_radius_center[enums::y] = lower_radius_center[enums::y]; // this makes it tangential to the rectangular part in the middle
 
 		// Compute the x-coordinate of the left- and rightmost vertices
-		 double lower_end = - ( length_parallel/2. + transition_radius + hwidth_b + extension_lower );
-		 double upper_end = + ( length_parallel/2. + transition_radius + hwidth_b + extension_upper );
+		 //double lower_end = - ( length_parallel/2. + transition_radius + hwidth_b + extension_lower );
+		 double lower_end = - desired_length/2.;
+		 //double upper_end = + ( length_parallel/2. + transition_radius + hwidth_b + extension_upper );
+		 double upper_end = desired_length/2.;
 
 		// Set boundary IDs and and manifolds
 		for (typename Triangulation<dim>::active_cell_iterator
@@ -668,9 +621,11 @@ namespace tensileSpecimen
 		// ************************************************************************************************************	
 	    // From now on 3D
 		// Compute the x-coordinate of the left- and rightmost vertices
-		 double lower_end = - ( length_parallel/2. + transition_radius + hwidth_b + extension_lower );
-		 double upper_end = + ( length_parallel/2. + transition_radius + hwidth_b + extension_upper );
-		
+		 //double lower_end = - ( length_parallel/2. + transition_radius + hwidth_b + extension_lower );
+		 double lower_end = - desired_length/2.;
+		 //double upper_end = + ( length_parallel/2. + transition_radius + hwidth_b + extension_upper );
+		 double upper_end = desired_length/2.;
+
 		// Expand the center points to 3D
 		 Point<3> upper_radius_center_3D;
 		 Point<3> lower_radius_center_3D;
@@ -771,6 +726,26 @@ namespace tensileSpecimen
 
 		 // @todo check the use of only anisotropic xy refinements to keep the thickness direction
 		// Refine the cells in the parallel part
+		// Once refine by cut_x
+		 for (typename Triangulation<dim>::active_cell_iterator
+					 cell = triangulation.begin_active();
+					 cell != triangulation.end(); ++cell)
+		 {
+			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+				// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
+				if ( std::abs( cell->face(face)->center()[enums::x] ) <= parameter.referenceLength/2. )//length_parallel/(4.+2.*double(nbr_local_ref)) )
+				{
+					// @todo Multiple local anisotropic refinements cause DII to fail, Why?
+//						if ( nbr_local_ref==1 || nbr_local_ref==3 || nbr_local_ref==5 || nbr_local_ref==7 ) // even
+						cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine in x and y-direction
+//						else
+//							cell->set_refine_flag(RefinementCase<dim>::cut_x); // refine only in the x-direction
+					break;
+				}
+		 }
+		 triangulation.execute_coarsening_and_refinement();
+
+		// Refine innermost part by cut_xy
 		 for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
 		 {
 			for (typename Triangulation<dim>::active_cell_iterator
@@ -779,7 +754,7 @@ namespace tensileSpecimen
 			{
 				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
 					// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
-					if ( std::abs( cell->face(face)->center()[enums::x] ) <= 3. )//length_parallel/(4.+2.*double(nbr_local_ref)) )
+					if ( std::abs( cell->face(face)->center()[enums::x] ) <= 2. )//length_parallel/(4.+2.*double(nbr_local_ref)) )
 					{
 						// @todo Multiple local anisotropic refinements cause DII to fail, Why?
 //						if ( nbr_local_ref==1 || nbr_local_ref==3 || nbr_local_ref==5 || nbr_local_ref==7 ) // even
