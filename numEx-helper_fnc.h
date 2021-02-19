@@ -157,7 +157,6 @@ namespace numEx
 		}
 	}
 	
-	
 	template<int dim>
 	void BC_apply_fix ( const enums::enum_boundary_ids boundary_id, const DoFHandler<dim> &dof_handler, 
 						const FESystem<dim> &fe, AffineConstraints<double> &constraints )
@@ -286,9 +285,67 @@ namespace numEx
 		  }
 		}
 		// Ensure that we shifted at least a single node
-		 AssertThrow( shifted_node==true, ExcMessage("shift_vertex_layer<< You haven't moved a single node. Please check the selection criterion initial_pos."));
+		 AssertThrow( shifted_node==true, ExcMessage("shift_vertex_layer<< You haven't moved a single node. Please check the selection criterion initial_pos "
+				 	 	 	 	 	 	 	 	 	 +std::to_string(initial_pos)+" vs your new_pos "+std::to_string(new_pos)+"."));
 	}
 	
+	template <int dim>
+	class BeamEnd : public Function<dim>
+	{
+	public:
+		BeamEnd ( const double &length0, const double &height0, const double &lambda_n, const double &current_load_increment, const unsigned int &n_components )
+		:
+			l_0(length0),
+			h_0(height0),
+			theta_n(lambda_n),
+			incr(current_load_increment),
+			n_comp(n_components)
+		{
+		}
+		virtual ~BeamEnd() {};
+
+		double l_0, h_0;
+		double theta_n;
+		double incr;
+		unsigned int n_comp;
+
+
+		// return all components at one point
+		virtual void vector_value(const Point<dim> &p, Vector<double>   &value) const
+		{
+			Tensor<1,dim> u_m_n;
+			u_m_n[enums::x] = l_0 * ( std::sin(theta_n+1e-10)/(theta_n+1e-10) - 1.);
+			u_m_n[enums::y] = l_0 * ( std::cos(theta_n+1e-10)/(theta_n+1e-10) - 1./(theta_n+1e-10));
+
+			const double theta_n1 = theta_n + incr;
+			Tensor<1,dim> u_m_n1;
+			u_m_n1[enums::x] = l_0 * ( std::sin(theta_n1+1e-10)/(theta_n1+1e-10) - 1.);
+			u_m_n1[enums::y] = l_0 * ( std::cos(theta_n1+1e-10)/(theta_n1+1e-10) - 1./(theta_n1+1e-10));
+
+			Tensor<1,dim> u_n;
+			u_n[enums::x] = 0 						+ u_m_n[enums::x] + (p[enums::y]-h_0/2.) * std::sin(theta_n);
+			u_n[enums::y] = -(p[enums::y]-h_0/2.) 	+ u_m_n[enums::y] + (p[enums::y]-h_0/2.) * std::cos(theta_n);
+
+			Tensor<1,dim> u_n1;
+			u_n1[enums::x] = 0 						+ u_m_n1[enums::x] + (p[enums::y]-h_0/2.) * std::sin(theta_n1);
+			u_n1[enums::y] = -(p[enums::y]-h_0/2.)	+ u_m_n1[enums::y] + (p[enums::y]-h_0/2.) * std::cos(theta_n1);
+
+			for ( unsigned int i=0; i<dim; i++)
+				value[i] = u_n1[i] - u_n[i];
+		}
+
+//		virtual double value (const Point<dim>   &p,
+//							const unsigned int   = 0) const override final
+//		{
+//			double val = 1.;
+//			SymmetricTensor<2,2> stress_tensor_dummy;
+//			Point<dim> point_xy = p;
+//			get_KIRSCH_stresses( point_xy, current_load, nu, stress_tensor_dummy, val);// 0929 stress_vonMises );
+//			return val;
+//		}
+	};
+
+
 	/**
 	 * @todo-optimize Use deal.II object information to get normal and tangent for the face
 	 */
@@ -626,6 +683,35 @@ namespace numEx
 			 }
 		}
 	}
+
+	template <int dim>
+	class EvalPointClass
+	{
+	public:
+		EvalPointClass() = default;
+
+		// Evaluation point and coordinate direction (x,y,z)
+		 EvalPointClass ( Point<3> eval_point , unsigned int direction )
+		 :
+		 eval_point(eval_point),
+		 direction(direction)
+		 {
+		 }
+		// @todo-extent If needed we can also add a Point together with a direction vector for evaluation.
+		// This flexibility is actually the reason this class was created and not replaced by a std::pair or similar.
+
+		 Point<3> eval_point;
+		 unsigned int direction = 99;
+
+		 double extract_disp_component ( const Vector<double> &pt_solution )
+		 {
+			 if ( direction == 99 )
+				 AssertThrow( false, ExcMessage("EvalPointClass<< You have not declared the evaluation point properly. "
+						 	 	 	 	 	    "We require a direction (x,y,z) or a direction vector "
+						 	 	 	 	 	    "(the latter is not yet implemented)."));
+			 return pt_solution[direction];
+		 }
+	};
 }
 
 
