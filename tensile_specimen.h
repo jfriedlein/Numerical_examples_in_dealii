@@ -18,6 +18,9 @@ using namespace dealii;
 
 namespace tensileSpecimen
 {
+	// Name of the numerical example
+	 std::string numEx_name = "tensileSpecimen";
+
 	// The loading direction: \n
 	// In which coordinate direction the load shall be applied, so x/y/z.
 	 const unsigned int loading_direction = enums::x;
@@ -28,7 +31,7 @@ namespace tensileSpecimen
 
 	// Desired overall length
 	// @todo Currently hardcoded, should be a parameter
-	 const double desired_length = 70.;
+	 const double desired_length = 70.; // SEP1230: 70, A50: 84
 
 	// Some internal parameters
 	 struct parameterCollection
@@ -91,7 +94,7 @@ namespace tensileSpecimen
 	}
 
 
-	// 2D grid
+	// grid generation for 2D and 3D
 	template <int dim>
 	void make_2D_grid( Triangulation<dim> &triangulation_2D, const Parameter::GeneralParameters &parameter )
 	{
@@ -223,7 +226,6 @@ namespace tensileSpecimen
 				GridGenerator::create_triangulation_with_removed_cells(tria_plate_hole,cells_to_remove,tria_quarter_plate_hole_lower);
 			}
 
-
 			// Adapt the width B (y-dimension) of the lower radial part
 			// By moving all the vertices that are too high (\a initial_pos) downwards to the new position \a new_pos that
 			// was defined as the width B.
@@ -265,7 +267,6 @@ namespace tensileSpecimen
 				}
 			 }
 		// ************************************************************************************************************
-
 
 		// ************************************************************************************************************
 		// radial part upper
@@ -782,24 +783,8 @@ namespace tensileSpecimen
 			}
 		 }
 
-
-		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-//		{
-//			std::ofstream out ("grid-tensileSpecimen.eps");
-//			GridOut grid_out;
-//			grid_out.write_eps (triangulation, out);
-//			std::cout << "Grid written to grid-3d_quarter_plate_merged.eps" << std::endl;
-//			AssertThrow(false, ExcMessage("Done"));
-//		}
-//		{
-//			std::ofstream out_ucd("Grid-3d_quarter_plate_merged.inp");
-//			GridOut grid_out;
-//			GridOutFlags::Ucd ucd_flags(true,true,true);
-//			grid_out.set_flags(ucd_flags);
-//			grid_out.write_ucd(triangulation, out_ucd);
-//			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
-//		}
-		
+		// Output the triangulation as eps or inp
+		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
 	}
 }
 
