@@ -20,6 +20,9 @@ namespace QuarterHyperCube_Merged
  * CERTIFIED TO STANDARD numExS07 (200724)
  */
 {
+	// Name of the numerical example
+	 std::string numEx_name = "QPlate";
+
 	// The loading direction: \n
 	// In which coordinate direction the load shall be applied, so x/y/z.
 	 const unsigned int loading_direction = enums::y;
@@ -531,29 +534,8 @@ namespace QuarterHyperCube_Merged
 				triangulation.execute_coarsening_and_refinement();
 			}
 		}
-		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-		/*
-		{
-			std::ofstream out ("grid-2d_quarter_plate_merged.eps");
-			GridOut grid_out;
-			GridOutFlags::Eps<2> eps_flags;
-			eps_flags.line_width = 0.1;
-			grid_out.set_flags (eps_flags);
-			grid_out.write_eps (triangulation, out);
-			std::cout << "Grid written to grid-2d_quarter_plate_merged.eps" << std::endl;
-			std::cout << "nElem: " << triangulation.n_active_cells() << std::endl;
-			AssertThrow(false,ExcMessage("ddd"));
-		}
-
-		{
-			std::ofstream out_ucd("Grid-2d_quarter_plate_merged.inp");
-			GridOut grid_out;
-			GridOutFlags::Ucd ucd_flags(true,true,true);
-			grid_out.set_flags(ucd_flags);
-			grid_out.write_ucd(triangulation, out_ucd);
-			std::cout<<"Mesh written to Grid-2d_quarter_plate_merged.inp "<<std::endl;
-		}
-		*/
+		// Output the triangulation as eps or inp
+		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
 	}
 
 /**
