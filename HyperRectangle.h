@@ -51,23 +51,23 @@ namespace HyperRectangle
 	const bool trigger_localisation_by_notching = true;
 	const enums::enum_coord notched_face = enums::x;
 	const bool use_fine_and_coarse_brick = false;
-	const bool refine_local_isotropic = false;
-	const bool notch_round = true;
-	const bool notch_twice = true;
+	const bool refine_local_isotropic = true;
+	const enums::enum_notch_type notch_type = enums::notch_linear;
+	const bool notch_twice = false;
 	
 	// Boundary conditions
-	 const bool constrain_sideways_sliding_of_loaded_face = true;
+	 const bool constrain_sideways_sliding_of_loaded_face = false;
 	 const bool apply_sym_constraint_on_top_face = false; // to simulate plane strain for 3D, top face refers to zPlus
 	 
-//	 const enums::enum_BC BC_xMinus = enums::BC_sym; // standard, tension
-//	 const enums::enum_BC BC_yPlus  = enums::BC_none; // standard, tension
-//	 const enums::enum_BC BC_yMinus = enums::BC_sym; // standard, tension
-//	 const enums::enum_BC BC_zMinus = enums::BC_sym; // standard, tension
+	 const enums::enum_BC BC_xMinus = enums::BC_sym; // standard, tension
+	 const enums::enum_BC BC_yPlus  = enums::BC_none; // standard, tension
+	 const enums::enum_BC BC_yMinus = enums::BC_sym; // standard, tension
+	 const enums::enum_BC BC_zMinus = enums::BC_sym; // standard, tension
 
-	 const enums::enum_BC BC_xMinus = enums::BC_none; // compression, Seupel et al
-	 const enums::enum_BC BC_yPlus  = enums::BC_x0; // guide top face
-	 const enums::enum_BC BC_yMinus = enums::BC_fix; // compression, Seupel et al
-	 const enums::enum_BC BC_zMinus = enums::BC_none; // 3D compression, Seupel et al
+//	 const enums::enum_BC BC_xMinus = enums::BC_none; // compression, Seupel et al
+//	 const enums::enum_BC BC_yPlus  = enums::BC_x0; // guide top face
+//	 const enums::enum_BC BC_yMinus = enums::BC_fix; // compression, Seupel et al
+//	 const enums::enum_BC BC_zMinus = enums::BC_none; // 3D compression, Seupel et al
 
 	// Notching
 	 const types::manifold_id manifold_id_notch_left = 10;
@@ -255,10 +255,11 @@ namespace HyperRectangle
 		// Notch the brick
 		 if ( trigger_localisation_by_notching && notch_list[0].depth > 1e-20 )
 		 {
-			 if ( notch_round )
+			 //if ( notch_type == enums::notch_round )
 			 {
 				 // prepare the mesh
-				  numEx::prepare_tria_for_notching( tria_flat, notch_list[0] );
+				 if ( notch_type == enums::notch_round )
+					 numEx::prepare_tria_for_notching( tria_flat, notch_list[0] );
 				 numEx::notch_body( tria_flat, notch_list[0] );
 				 
 				 const Point<2> cyl_center_2D ( notch_list[0].cyl_center[0], notch_list[0].cyl_center[1] );
@@ -384,23 +385,23 @@ namespace HyperRectangle
 		 body_dimensions[enums::y] = length;
 		 const double thickness = parameter.thickness;
 		 body_dimensions[enums::z] = thickness;
-		
+
 		const unsigned int n_elements_in_x_for_coarse_mesh = parameter.grid_y_repetitions;
 		const double notch_reduction = parameter.ratio_x;
-		 Point<3> notch_reference_point ( width, width, 0);
+		 Point<3> notch_reference_point ( width, 0, 0);
 		 Point<3> face_normal(1.,0,0);
 		Point<3> axis_dir (0,0,1);
 
 		 double notch_depth = (1.-notch_reduction)*width;
-		 
+
 		 // notching
-		 numEx::NotchClass<2> notch ( enums::notch_round, parameter.notchWidth, notch_depth, notch_reference_point, enums::id_boundary_xPlus,
-										face_normal, enums::y, manifold_id_notch_left );
-		 
+		numEx::NotchClass<2> notch ( notch_type, parameter.notchWidth, notch_depth, notch_reference_point, enums::id_boundary_xPlus,
+									face_normal, enums::y, manifold_id_notch_left );
+
 		Triangulation<2> tria_flat;
 		make_grid_flat( tria_flat, length, width, {notch},
 						n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements );
-		
+
 		GridGenerator::extrude_triangulation( tria_flat, parameter.nbr_elementsInZ, parameter.thickness, triangulation, true );
 
 		// Redo the manifold for 3D
@@ -424,27 +425,30 @@ namespace HyperRectangle
 		 
 		// In case we want local refinements to be isotropic (so refined in y and x and z).
 		// We do this after the notching, so we can get away with slightly deeper notches.
-//		 if ( refine_local_isotropic )
-//		 {
-//			for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
-//			{
-//				for (typename Triangulation<dim>::active_cell_iterator
-//							 cell = triangulation.begin_active();
-//							 cell != triangulation.end(); ++cell)
-//				{
-//					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
-//					{
-//						// Find all cells that lay in an exemplary damage band with size 1/4 from the y=0 face
-//						if ( cell->vertex(vertex)[enums::y] < length_refined )
-//						{
-//							cell->set_refine_flag();
-//							break; // break the for(vertex)
-//						}
-//					} // end for(vertex)
-//				} // end for(cell)
-//				triangulation.execute_coarsening_and_refinement();
-//			}
-//		 } // end if(refine_local_isotropic)
+		 if ( refine_local_isotropic )
+		 {
+			for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
+			{
+				for (typename Triangulation<dim>::active_cell_iterator
+							 cell = triangulation.begin_active();
+							 cell != triangulation.end(); ++cell)
+				{
+					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+					{
+						// Find all cells that lay in an exemplary damage band with size 1/4 from the y=0 face
+						if ( cell->vertex(vertex)[enums::y] < std::min( 1.*width, 0.9 * length ) )
+						{
+							if ( nbr_local_ref>=1 )
+								cell->set_refine_flag(RefinementCase<dim>::cut_y);
+							else
+								cell->set_refine_flag();
+							break; // break the for(vertex)
+						}
+					} // end for(vertex)
+				} // end for(cell)
+				triangulation.execute_coarsening_and_refinement();
+			}
+		 } // end if(refine_local_isotropic)
 		
 		// Output the triangulation as eps or inp
 		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
