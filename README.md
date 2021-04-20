@@ -41,11 +41,25 @@ Major changes:
 * add optional parameters/switches (e.g. apply z-sym on pos z-face) as global variables into a standardised framework
 
 ## Interface
+*** @todo *** document the interfaces
+
 * make_grid(*):
 
-Creates the triangulation (2D or 3D), requires additional parameters (can also be hardcoded into the function) and boundary ids
+```
+    QuarterHyperCube_Merged::make_grid<dim> ( triangulation, parameter );
+    loading_direction = QuarterHyperCube_Merged::loading_direction;
+    boundary_id_collection[enums::id_primary_load] = QuarterHyperCube_Merged::id_boundary_load;
+    boundary_id_collection[enums::id_secondary_load] = QuarterHyperCube_Merged::id_boundary_secondaryLoad;
+```
+
+Creates the triangulation (2D or 3D), requires additional parameters (can also be hardcoded into the function) and boundary ids (`std::vector<enums::enum_boundary_ids> boundary_id_collection`).
 
 * make_constraints(*):
+
+```
+			QuarterHyperCube_Merged::make_constraints<dim> ( constraints, fe, n_components, dof_handler_ref, apply_dirichlet_bc,
+															 load_increment, parameter);
+```
 
 Apply the boundary conditions onto the faces, e.g. symmetry BC.
 
