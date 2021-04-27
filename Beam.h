@@ -41,7 +41,7 @@ namespace Beam
 {
 	// The loading direction: \n
 	// In which coordinate direction the load shall be applied, so x/y/z.
-	 const unsigned int loading_direction = enums::y;
+	 const unsigned int loading_direction = enums::x; // TEST: before y
 
 	// The loaded faces:
 	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_xPlus;
@@ -73,7 +73,11 @@ namespace Beam
 			numEx::BC_apply( enums::id_boundary_zMinus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 		// BC for the load ...
-		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver, alternatively  ...
+		 if ( parameter.driver == enums::Neumann )
+		 {
+			numEx::BC_apply_fix( enums::id_boundary_xMinus2, dof_handler_ref, fe, constraints );
+		 }
+		 else if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver, alternatively  ...
 		 {
 			if ( beam_type==enums::beam_clamped_sliding )
 				numEx::BC_apply( id_boundary_load, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
@@ -94,6 +98,7 @@ namespace Beam
 //				numEx::BC_apply( id_boundary_load, enums::y, current_load_increment_y, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 //			}
 
+			// prescribed pseudo pure bending load
 			numEx::BeamEnd<dim> beamEnd (body_dimensions[enums::x], body_dimensions[enums::y], lambda_n, current_load_increment, n_components);
 
 			if (apply_dirichlet_bc == true )
@@ -237,6 +242,13 @@ namespace Beam
 					if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance)
 					{
 						cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
+						for ( unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_face; ++vertex)
+						{
+							if ( cell->face(face)->vertex(vertex).distance(Point<dim> (0,0)) < 1e-10 )
+							{
+								cell->face(face)->set_boundary_id(enums::id_boundary_xMinus2);
+							}
+						}
 					}
 					else if (std::abs(cell->face(face)->center()[enums::x] - body_dimensions[enums::x]) < search_tolerance)
 					{
