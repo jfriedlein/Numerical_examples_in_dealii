@@ -38,8 +38,11 @@ namespace enums
 		id_boundary_secondaryLoad_default = 9,
 
 		id_body_dummy = 10,
+
+		id_boundary_xMinus1 = 21,
 		id_boundary_xMinus2 = 22,
 		id_boundary_xPlus1 = 31,
+		id_boundary_xPlus2 = 32,
 		id_boundary_yPlus2 = 52
 	};
 
@@ -62,7 +65,8 @@ namespace enums
     	Mesh_refine_special_standard = 0,
 		Rod_refine_special_uniform = 1,
 		Mesh_refine_special_innermost = 2,
-		Mesh_refine_special_Simo = 3
+		Mesh_refine_special_Simo = 3,
+		Mesh_refine_uniform = 4
 	};
     
     enum enum_coord
