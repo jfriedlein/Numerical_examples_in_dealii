@@ -36,8 +36,8 @@ namespace Rod
 	 const enums::enum_notch_type notch_type = enums::notch_linear;
 
 	// BC
-//	 const enums::enum_BC BC_yPlus  = enums::BC_x0_z0; // special: no contraction of loaded face
-	 const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard
+	 const enums::enum_BC BC_yPlus  = enums::BC_x0_z0; // special: no contraction of loaded face
+//	 const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard
 
 	// Some internal parameters
 	 struct parameterCollection
@@ -102,6 +102,9 @@ namespace Rod
 			// Let's first refine the "cylinder" ones, because the initial mesh is a brick
 			 tria_full_cylinder.refine_global( 1 );
 
+			if ( parameter.refine_special == enums::Mesh_refine_uniform )
+				tria_full_cylinder.refine_global(n_global_refinements);	// ... Parameter.prm file
+
 			// We rotate the cylinder (oriented along x-axis by default) by 90° (=std::atan(1)*2 rad) around the z-axis
 			 GridTools::rotate( std::atan(1)*2, z, tria_full_cylinder);
 
@@ -121,15 +124,9 @@ namespace Rod
 			GridGenerator::create_triangulation_with_removed_cells(tria_full_cylinder,cells_to_remove,triangulation);
 		 }
 
-		// Clear boundary ID's
-		for (typename Triangulation<dim>::active_cell_iterator
-			 cell = triangulation.begin_active();
-			 cell != triangulation.end(); ++cell)
-		{
-			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-			  if (cell->face(face)->at_boundary())
-				  cell->face(face)->set_all_boundary_ids(0);
-		}
+		// Clear all existing boundary ID's
+		 numEx::clear_boundary_IDs( triangulation );
+
 
 		// Set boundary IDs and and manifolds
 		for (typename Triangulation<dim>::active_cell_iterator
@@ -156,6 +153,7 @@ namespace Rod
 		}
 
 		// Attach a manifold to the curved boundary
+		// @todo repair this, inner cells are placed chaotically
 		// @note We can only guarantee that the vertices sit on the curve, so we must test with their position instead of the cell centre.
 		for (typename Triangulation<dim>::active_cell_iterator
 		   cell = triangulation.begin_active();
@@ -165,8 +163,10 @@ namespace Rod
 			if (cell->face(face)->at_boundary())
 			  for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex)
 			  {
-				 // Compute the projected radius in the xz-plane, so the distance between the vertex and the y-axis
-				  double distance_2d_xz = std::sqrt( cell->vertex(vertex)[x]*cell->vertex(vertex)[x] + cell->vertex(vertex)[z]*cell->vertex(vertex)[z] );
+				 // Compute the projected radius in the xz-plane, so the distance between the vertex \a node and the y-axis
+				  Point<dim> node = cell->face(face)->vertex(vertex);
+				  double distance_2d_xz = std::sqrt( node[x]*node[x] + node[z]*node[z] );
+
 				 if ( std::abs(distance_2d_xz - radius) < search_tolerance )
 				 {
 					// This vertex lies on the outer surface, hence the face and the face belongs to the manifold
@@ -177,9 +177,9 @@ namespace Rod
 			  }
 		}
 
-			// Create a cylindrical manifold to be put on the outer cylindrical surface
-			 CylindricalManifold<dim> cylindrical_manifold_3d (y); // y-axis
-			 triangulation.set_manifold( parameters_internal.manifold_id_surf, cylindrical_manifold_3d );
+		// Create a cylindrical manifold to be put on the outer cylindrical surface
+		 CylindricalManifold<dim> cylindrical_manifold_3d (y); // y-axis
+		 triangulation.set_manifold( parameters_internal.manifold_id_surf, cylindrical_manifold_3d );
 
 		double cell_size_innermost = 9e9;
 		if ( parameter.refine_special == enums::Mesh_refine_special_standard || parameter.refine_special == enums::Mesh_refine_special_innermost )
@@ -292,6 +292,10 @@ namespace Rod
 				triangulation.execute_coarsening_and_refinement();
 			 }
 		}
+		else if ( parameter.refine_special == enums::Mesh_refine_uniform )
+		{
+			// nothing
+		}
 //		else if ( parameter.refine_special == enums::Mesh_refine_y )
 //		{
 //			// Global refinement of the mesh to get a better approximation of the contour:\n
@@ -362,7 +366,8 @@ namespace Rod
 		// Possibly some additional global isotropic refinements
 		// @todo-assure: We shifted these global refinements before the special innermost refinements, so
 		// we truely only refine the actual innermost cell.
-		 triangulation.refine_global(n_global_refinements);	// ... Parameter.prm file
+		if ( parameter.refine_special != enums::Mesh_refine_uniform )
+			triangulation.refine_global(n_global_refinements);	// ... Parameter.prm file
 
 		// For the innermost refinement case, we also focus the refinements specifically on the
 		// innermost cell, in addition to the above refinement of the notched region
