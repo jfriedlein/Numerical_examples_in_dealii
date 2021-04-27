@@ -139,18 +139,8 @@ namespace Butterfly_shear
 
 			 GridGenerator::merge_triangulations( {&tria_leftWing, &tria_body, &tria_rightWing}, triangulation, 1e-6 );
 
-			// ToDo-optimize: The following is similar for 2D and 3D, maybe merge it
-			//Clear boundary ID's
-			for (typename Triangulation<dim>::active_cell_iterator
-				 cell = triangulation.begin_active();
-				 cell != triangulation.end(); ++cell)
-			{
-				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-				  if (cell->face(face)->at_boundary())
-				  {
-					  cell->face(face)->set_all_boundary_ids(0);
-				  }
-			}
+			// Clear all existing boundary ID's
+			 numEx::clear_boundary_IDs( triangulation );
 
 			//Set boundary IDs and and manifolds
 			for (typename Triangulation<dim>::active_cell_iterator
