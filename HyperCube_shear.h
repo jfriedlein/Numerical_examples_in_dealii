@@ -67,6 +67,11 @@ namespace HyperCube_shear
 		static constexpr double search_tolerance = 1e-12;
 	 };
 	 
+	// Evaluation points: \n
+	// @todo We need \a dim here instead of 2, but dim is unkown at this place -> redesign
+	 std::vector< numEx::EvalPointClass<3> > eval_points_list (2, numEx::EvalPointClass<3>() );
+
+
 	// All additional parameters
 	// @todo Group them somehow
 	 const bool element_distortion = false;
@@ -112,27 +117,64 @@ namespace HyperCube_shear
 		// BC for the load ...
 		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver, alternatively  ...
 		 {
+			 // symmetric shear [Heiduschke]
+			 const double load = current_load_step*parameter.AL_initial_increment;
+			 const double load_last = load - parameter.AL_initial_increment;
+			 const double width = 1.;
+			 const double height = 1.;
+			 const double Delta_u2 = width * ( 1./std::sqrt(std::cos(load)) - 1./std::sqrt(std::cos(load_last)) );
+			 const double Delta_u4 = width * ( std::sin(load)/std::sqrt(std::cos(load)) - std::sin(load_last)/std::sqrt(std::cos(load_last)) );
+			 const double Delta_u5 = width * ( std::sqrt(std::cos(load)) - std::sqrt(std::cos(load_last)) );
+			 const double Delta_u6 = Delta_u2 + Delta_u4;
+			 const double Delta_u7 = Delta_u5;
+
+			 // First, add lines to the constraints matrix
+			  for ( unsigned int i=0; i<8; i++)
+				 constraints.add_line(i);
+			 // Then, we fill all desired non-zero entries, here we fill every entry even the entries that are zero
+			 // symmetric shear
+			  constraints.set_inhomogeneity(0,0);
+			  constraints.set_inhomogeneity(1,0);
+			  constraints.set_inhomogeneity(2,Delta_u2);
+			  constraints.set_inhomogeneity(3,0);
+			  constraints.set_inhomogeneity(4,Delta_u4);
+			  constraints.set_inhomogeneity(5,Delta_u5);
+			  constraints.set_inhomogeneity(6,Delta_u6);
+			  constraints.set_inhomogeneity(7,Delta_u7);
+
+//			 // simple shear
+//			  constraints.set_inhomogeneity(0,0);
+//			  constraints.set_inhomogeneity(1,0);
+//			  constraints.set_inhomogeneity(2,0);
+//			  constraints.set_inhomogeneity(3,0);
+//			  constraints.set_inhomogeneity(4,Delta_u4);
+//			  constraints.set_inhomogeneity(5,0);
+//			  constraints.set_inhomogeneity(6,Delta_u4);
+//			  constraints.set_inhomogeneity(7,0);
+
+			 // Combined tension/compression - shear
 //			 if ( current_load_step<=parameter.nbr_loadsteps ) // tension
 //			 {
 //				 numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 //				 numEx::BC_apply( enums::id_boundary_yMinus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 //				 // no contraction:
 //				  numEx::BC_apply( enums::id_boundary_xPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-//
-//				 numEx::BC_apply( id_boundary_load, enums::y, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+//				  // TEST
+//				  const double tension_compression = parameter.beta_d / std::abs(parameter.beta_d);
+//				 numEx::BC_apply( id_boundary_load, enums::y, current_load_increment*tension_compression, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 //			 }
 //			 else // shear
 //			 {
 //				 numEx::BC_apply_fix( enums::id_boundary_yMinus, dof_handler_ref, fe, constraints );
-//				 numEx::BC_apply( enums::id_boundary_yPlus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+//				 numEx::BC_apply( enums::id_boundary_yPlus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints ); // guide the top face
 //
 //				 numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 //			 }
 
-			 numEx::BC_apply_fix( enums::id_boundary_yMinus, dof_handler_ref, fe, constraints );
-			 numEx::BC_apply( id_boundary_load, enums::y, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-
-			 numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+//			 numEx::BC_apply_fix( enums::id_boundary_yMinus, dof_handler_ref, fe, constraints );
+//			 numEx::BC_apply( id_boundary_load, enums::y, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+//
+//			 numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 		 }
 		 else if ( parameter.driver == enums::Contact ) // ... as contact
 		 {
@@ -407,6 +449,11 @@ namespace HyperCube_shear
 										Point<3>(-1,0,0), enums::y);
 		 numEx::notch_body( triangulation, notch );
 
+		// Evaluation points and the related list of them
+		 numEx::EvalPointClass<3> eval_topLeftX ( Point<3>(0,width,0), enums::x );
+		 numEx::EvalPointClass<3> eval_topLeftY ( Point<3>(0,width,0), enums::y );
+
+		 eval_points_list = {eval_topLeftX,eval_topLeftY};
 
 		// Output the triangulation as eps or inp
 		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
