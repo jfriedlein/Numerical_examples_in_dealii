@@ -36,8 +36,8 @@ namespace Rod
 	 const enums::enum_notch_type notch_type = enums::notch_linear;
 
 	// BC
-	 const enums::enum_BC BC_yPlus  = enums::BC_x0_z0; // special: no contraction of loaded face
-//	 const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard
+//	 const enums::enum_BC BC_yPlus  = enums::BC_x0_z0; // special: no contraction of loaded face
+	 const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard
 
 	// Some internal parameters
 	 struct parameterCollection
@@ -295,6 +295,36 @@ namespace Rod
 		else if ( parameter.refine_special == enums::Mesh_refine_uniform )
 		{
 			// nothing
+			 for (unsigned int refine_counter=0; refine_counter < n_additional_refinements; refine_counter++)
+			 {
+				for (typename Triangulation<dim>::active_cell_iterator
+				   cell = triangulation.begin_active();
+				   cell != triangulation.end(); ++cell)
+				{
+//					const Point<dim> cell_centre = cell->center();
+//					const double radius_xz = std::sqrt( cell_centre[enums::x]*cell_centre[enums::x] + cell_centre[enums::z]*cell_centre[enums::z] );
+//					if ( radius_xz  > 0.85*radius )
+//						cell->set_refine_flag();
+//					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+//						if (cell->face(face)->at_boundary())
+//							if ( cell->face(face)->manifold_id() == parameters_internal.manifold_id_surf )
+//							{
+//								cell->set_refine_flag();
+//								break;
+//							}
+					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
+					{
+						const Point<dim> vertex_coord = cell->vertex(vertex);
+						const double radius_xz = std::sqrt( vertex_coord[enums::x]*vertex_coord[enums::x] + vertex_coord[enums::z]*vertex_coord[enums::z] );
+						if ( std::abs( radius_xz - radius ) < search_tolerance )
+						{
+							cell->set_refine_flag();
+							break;
+						}
+					}
+				}
+				triangulation.execute_coarsening_and_refinement();
+			 }
 		}
 //		else if ( parameter.refine_special == enums::Mesh_refine_y )
 //		{
