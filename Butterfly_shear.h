@@ -62,87 +62,109 @@ namespace Butterfly_shear
 
 
 	// 2D grid
-		template <int dim>
-		void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
+	template <int dim>
+	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
+	{
+		// ToDo-assure: the use the values from the parameter file
+		// _b: body of butterfly
+		// _w: wing of butterfly
+		const double width_b = 2.; //parameter.width;
+		const double height_b = 5.;// parameter.height;
+		const double width_w = 5.; // wing width
+		const double height_w = 15.; // wing height
+
+		const double aux_ratio = (height_w-height_b)/(2.*width_w);
+		const double notch_radius = width_b/2. / (aux_ratio/std::sqrt(1+aux_ratio*aux_ratio));
+
+		body_dimensions[enums::x] = 2.*width_w+width_b;
+		body_dimensions[enums::y] = height_w;
+
+		// Set the evaluation point
+		if ( loading_direction == enums::y )
 		{
-			// ToDo-assure: the use the values from the parameter file
-			const double width_b = 2.; //parameter.width; // use thickness=width for square bottom area
-			const double height_b = 5.;// parameter.height;
-			const double width_w = 5.; // wing width
-			const double height_w = 15.; // wing height
+			 eval_point[enums::x] = body_dimensions[enums::x];
+			 eval_point[enums::y] = body_dimensions[enums::y];
+		}
+		else if ( loading_direction == enums::x )
+		{
+			 eval_point[enums::x] = body_dimensions[enums::x];
+			 eval_point[enums::y] = body_dimensions[enums::y]/2.;
+		}
 
-			const double aux_ratio = (height_w-height_b)/(2.*width_w);
-			const double notch_radius = width_b/2. / (aux_ratio/std::sqrt(1+aux_ratio*aux_ratio));
+		parameterCollection parameters_internal;
 
-			body_dimensions[enums::x] = 2.*width_w+width_b;
-			body_dimensions[enums::y] = height_w;
+		const double search_tolerance = parameters_internal.search_tolerance;
 
-			// Set the evaluation point
-			if ( loading_direction == enums::y )
-			{
-				 eval_point[enums::x] = body_dimensions[enums::x];
-				 eval_point[enums::y] = body_dimensions[enums::y];
-			}
-			else if ( loading_direction == enums::x )
-			{
-				 eval_point[enums::x] = body_dimensions[enums::x];
-				 eval_point[enums::y] = body_dimensions[enums::y]/2.;
-			}
+		// Create the left wing
+		 Point<dim> p1 (0,0);
+		 Point<dim> p2 (width_w, height_w);
+		 Triangulation<2> tria_leftWing;
+		 GridGenerator::hyper_rectangle 	( 	tria_leftWing,
+												p1,
+												p2
+											);
+		 // Move some of the outer points inwards to form trapezoidal wings
+		 // @note The vertex 0 is bottom-left, 1 is bottom-right, 2 is top-left, 3 is top-right
+		  for (typename Triangulation<dim>::active_cell_iterator
+			  cell = tria_leftWing.begin_active();
+			  cell != tria_leftWing.end(); ++cell)
+		  {
+			cell->vertex(1)[enums::y] += (height_w-height_b)/2.;
+			cell->vertex(3)[enums::y] -= (height_w-height_b)/2.;
+		  }
 
-			parameterCollection parameters_internal;
+		// Create the central body
+		 Point<dim> p3 (width_w, (height_w-height_b)/2.);
+		 Point<dim> p4 (width_w+width_b, (height_w-height_b)/2.+height_b);
+		 Triangulation<2> tria_body;
+		 GridGenerator::hyper_rectangle 	( 	tria_body,
+												p3,
+												p4
+											);
 
-			const double search_tolerance = parameters_internal.search_tolerance;
+		// Create the right wing
+		 Point<dim> p5 (width_w+width_b, 0);
+		 Point<dim> p6 (2.*width_w+width_b, height_w);
+		 Triangulation<2> tria_rightWing;
+		 GridGenerator::hyper_rectangle 	( 	tria_rightWing,
+												p5,
+												p6
+											);
+		 // Move some of the outer points inwards to form trapezoidal wings
+		 // @note The vertex 0 is bottom-left, 1 is bottom-right, 2 is top-left, 3 is top-right
+		  for (typename Triangulation<dim>::active_cell_iterator
+			  cell = tria_rightWing.begin_active();
+			  cell != tria_rightWing.end(); ++cell)
+		  {
+			cell->vertex(0)[enums::y] += (height_w-height_b)/2.;
+			cell->vertex(2)[enums::y] -= (height_w-height_b)/2.;
+		  }
 
-			// The points that span the brick
-			 Point<dim> p1 (0,0);
-			 Point<dim> p2 (width_w, height_w);
-			 Triangulation<2> tria_leftWing;
-			 GridGenerator::hyper_rectangle 	( 	tria_leftWing,
-													p1,
-													p2
-												);
-			// Move some of the outer points inwards to form trapezoidal wings
-			// @note The vertex 0 is bottom-left, 1 is bottom-right, 2 is top-left, 3 is top-right
-			 for (typename Triangulation<dim>::active_cell_iterator
-				  cell = tria_leftWing.begin_active();
-				  cell != tria_leftWing.end(); ++cell)
-			 {
-				cell->vertex(1)[enums::y] += (height_w-height_b)/2.;
-				cell->vertex(3)[enums::y] -= (height_w-height_b)/2.;
-			 }
+		// Merge the wings and the body
+		 GridGenerator::merge_triangulations( {&tria_leftWing, &tria_body, &tria_rightWing}, triangulation, 1e-6 );
 
-			 Point<dim> p3 (width_w, (height_w-height_b)/2.);
-			 Point<dim> p4 (width_w+width_b, (height_w-height_b)/2.+height_b);
-			 Triangulation<2> tria_body;
-			 GridGenerator::hyper_rectangle 	( 	tria_body,
-													p3,
-													p4
-												);
+		// Clear all existing boundary ID's
+		 numEx::clear_boundary_IDs( triangulation );
 
+		// Set boundary IDs and and manifolds
+		 for (typename Triangulation<dim>::active_cell_iterator
+			 cell = triangulation.begin_active();
+			 cell != triangulation.end(); ++cell)
+		 {
+			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+			  if (cell->face(face)->at_boundary())
+			  {
+				//Set boundary IDs
+				if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance )
+					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
+				else if (std::abs(cell->face(face)->center()[0] - body_dimensions[enums::x]) < search_tolerance)
+					cell->face(face)->set_boundary_id(enums::id_boundary_xPlus);
+			  }
+		 }
 
-			 Point<dim> p5 (width_w+width_b, 0);
-			 Point<dim> p6 (2.*width_w+width_b, height_w);
-			 Triangulation<2> tria_rightWing;
-			 GridGenerator::hyper_rectangle 	( 	tria_rightWing,
-													p5,
-													p6
-												);
-			// Move some of the outer points inwards to form trapezoidal wings
-			// @note The vertex 0 is bottom-left, 1 is bottom-right, 2 is top-left, 3 is top-right
-			 for (typename Triangulation<dim>::active_cell_iterator
-				  cell = tria_rightWing.begin_active();
-				  cell != tria_rightWing.end(); ++cell)
-			 {
-				cell->vertex(0)[enums::y] += (height_w-height_b)/2.;
-				cell->vertex(2)[enums::y] -= (height_w-height_b)/2.;
-			 }
-
-			 GridGenerator::merge_triangulations( {&tria_leftWing, &tria_body, &tria_rightWing}, triangulation, 1e-6 );
-
-			// Clear all existing boundary ID's
-			 numEx::clear_boundary_IDs( triangulation );
-
-			//Set boundary IDs and and manifolds
+		// Attach the notch radius manifolds
+		 if ( true )
+		 {
 			for (typename Triangulation<dim>::active_cell_iterator
 				 cell = triangulation.begin_active();
 				 cell != triangulation.end(); ++cell)
@@ -150,100 +172,61 @@ namespace Butterfly_shear
 				for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
 				  if (cell->face(face)->at_boundary())
 				  {
-					//Set boundary IDs
-					if (std::abs(cell->face(face)->center()[0] - 0.0) < search_tolerance )
-					{
-						cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
-					}
-					else if (std::abs(cell->face(face)->center()[0] - body_dimensions[enums::x]) < search_tolerance)
-					{
-						cell->face(face)->set_boundary_id(enums::id_boundary_xPlus);
-					}
+					// Look for the faces at the top and bottom of the butterfly body cell
+					 if ( std::abs(cell->face(face)->center()[0] - body_dimensions[enums::x]/2.) < search_tolerance )
+					 {
+						// Upper radius
+						 if ( cell->face(face)->center()[enums::y] > body_dimensions[enums::y]/2. )
+							cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_upper_radius);
+						// Lower radius
+						 else if ( cell->face(face)->center()[enums::y] < body_dimensions[enums::y]/2. )
+							cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_lower_radius);
+					 }
 				  }
 			}
+			// For the upper radius
+			 Point<dim> centre_upper_radius (body_dimensions[enums::x]/2., (height_w-height_b)/2. + height_b + width_b/2. / aux_ratio);
+			 static SphericalManifold<dim> spherical_manifold_upper (centre_upper_radius);
+			 triangulation.set_manifold(parameters_internal.manifold_id_upper_radius,spherical_manifold_upper);
 
-			// Attach the notch radius manifolds
-			if ( true )
+			// For the lower radius
+			 Point<dim> centre_lower_radius (body_dimensions[enums::x]/2., (height_w-height_b)/2. - width_b/2. / aux_ratio );
+			 static SphericalManifold<dim> spherical_manifold_lower (centre_lower_radius);
+			 triangulation.set_manifold(parameters_internal.manifold_id_lower_radius,spherical_manifold_lower);
+		 }
+
+		// Refine the entire butterfly globally
+		 triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
+
+		// Local refinements of the inner part
+		 const double refine_local_spread = 1.2;
+		 {
+			for ( unsigned int nbr_local_ref=0; nbr_local_ref<parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
 			{
 				for (typename Triangulation<dim>::active_cell_iterator
-					 cell = triangulation.begin_active();
-					 cell != triangulation.end(); ++cell)
+							 cell = triangulation.begin_active();
+							 cell != triangulation.end(); ++cell)
 				{
 					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-					  if (cell->face(face)->at_boundary())
 					  {
-						// Look for the faces at the top and bottom of the butterfly body cell
-						if ( std::abs(cell->face(face)->center()[0] - body_dimensions[enums::x]/2.) < search_tolerance )
+						// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
+						if ( cell->face(face)->center()[enums::x] > width_w/refine_local_spread && cell->face(face)->center()[enums::x] < (width_w+width_b)*refine_local_spread )
 						{
-							// Upper radius
-							if ( cell->face(face)->center()[enums::y] > body_dimensions[enums::y]/2. )
-								cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_upper_radius);
-							else if ( cell->face(face)->center()[enums::y] < body_dimensions[enums::y]/2. )
-								cell->face(face)->set_all_manifold_ids(parameters_internal.manifold_id_lower_radius);
+							cell->set_refine_flag();
+							break;
 						}
 					  }
 				}
-				// For the upper radius
-				 Point<dim> centre_upper_radius (body_dimensions[enums::x]/2., (height_w-height_b)/2. + height_b + width_b/2. / aux_ratio);
-				 static SphericalManifold<dim> spherical_manifold_upper (centre_upper_radius);
-				 triangulation.set_manifold(parameters_internal.manifold_id_upper_radius,spherical_manifold_upper);
-
-				// For the lower radius
-				 Point<dim> centre_lower_radius (body_dimensions[enums::x]/2., (height_w-height_b)/2. - width_b/2. / aux_ratio );
-				 static SphericalManifold<dim> spherical_manifold_lower (centre_lower_radius);
-				 triangulation.set_manifold(parameters_internal.manifold_id_lower_radius,spherical_manifold_lower);
+				triangulation.execute_coarsening_and_refinement();
 			}
+		 }
 
-			triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
-
-			const double refine_local_spread = 1.2;
-			{
-				for ( unsigned int nbr_local_ref=0; nbr_local_ref<parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
-				{
-					for (typename Triangulation<dim>::active_cell_iterator
-								 cell = triangulation.begin_active();
-								 cell != triangulation.end(); ++cell)
-					{
-						for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-						  {
-							// Find all cells that lay in an exemplary damage band with size 1.5 mm from the y=0 face
-							if ( cell->face(face)->center()[enums::x] > width_w/refine_local_spread && cell->face(face)->center()[enums::x] < (width_w+width_b)*refine_local_spread )
-							{
-								cell->set_refine_flag();
-								break;
-							}
-						  }
-					}
-					triangulation.execute_coarsening_and_refinement();
-				}
-			}
-
-			// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-//			{
-//				std::ofstream out ("grid-2d_quarter_plate_merged.eps");
-//				GridOut grid_out;
-//				GridOutFlags::Eps<2> eps_flags;
-//				eps_flags.line_width = 0.1;
-//				grid_out.set_flags (eps_flags);
-//				grid_out.write_eps (triangulation, out);
-//				std::cout << "Grid written to grid-2d_quarter_plate_merged.eps" << std::endl;
-//				std::cout << "nElem: " << triangulation.n_active_cells() << std::endl;
-//				AssertThrow(false,ExcMessage("ddd"));
-//			}
-//
-//			{
-//				std::ofstream out_ucd("Grid-2d_quarter_plate_merged.inp");
-//				GridOut grid_out;
-//				GridOutFlags::Ucd ucd_flags(true,true,true);
-//				grid_out.set_flags(ucd_flags);
-//				grid_out.write_ucd(triangulation, out_ucd);
-//				std::cout<<"Mesh written to Grid-2d_quarter_plate_merged.inp "<<std::endl;
-//			}
-		}
+		// Output the triangulation as eps or inp
+		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
+	}
 
 
-
-// 3d grid
+	// 3d grid
 	template <int dim>
 	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
