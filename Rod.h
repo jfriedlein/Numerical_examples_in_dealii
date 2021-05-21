@@ -56,6 +56,12 @@ namespace Rod
 	 std::vector< numEx::EvalPointClass<3> > eval_points_list (2, numEx::EvalPointClass<3>() );
 
 
+//	 // Wall: Pushing down on the cube
+//	  Point<3> wall_point_on_plane = Point<3>(0.0,1.5,0.0);
+//	  const Point<3> wall_normal_unit_vector = Point<3>(0,-1.0,0);
+//	  std::shared_ptr<WallRigid<3>> rigid_wall = std::shared_ptr<WallRigid<3>>(new WallRigid<3>( {wall_point_on_plane,wall_normal_unit_vector,wall_normal_unit_vector} , {} ));
+
+
 	// 3D
 	template <int dim>
 	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
@@ -149,6 +155,21 @@ namespace Rod
 				// Cell at the other end of the rod
 				 else if (std::abs(cell->face(face)->center()[y] - half_length) < search_tolerance)
 						cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
+				 else
+				 {
+					  for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_face; ++vertex )
+					  {
+						 // Compute the projected radius in the xz-plane, so the distance between the vertex \a node and the y-axis
+						  Point<dim> node = cell->face(face)->vertex(vertex);
+						  double distance_2d_xz = std::sqrt( node[x]*node[x] + node[z]*node[z] );
+
+						 if ( std::abs(distance_2d_xz - radius) < search_tolerance )
+						 {
+							cell->face(face)->set_boundary_id(enums::id_boundary_zPlus);
+							break;
+						 }
+					  }
+				 }
 			  }
 		}
 
@@ -667,6 +688,11 @@ namespace Rod
 		// BC for the load ...
 		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver
 			numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+//		 else if ( parameter.driver == enums::Contact ) // ... as contact
+//		 {
+//			if (apply_dirichlet_bc == true )
+//				rigid_wall->move( current_load_increment );
+//	 	 }
 	}
 
 	// 3d grid
@@ -741,15 +767,8 @@ namespace Rod
 			 GridGenerator::create_triangulation_with_removed_cells(tria_full_cylinder,cells_to_remove,triangulation);
 		 }
 
-		// Clear boundary ID's
-		 for (typename Triangulation<dim>::active_cell_iterator
-			 cell = triangulation.begin_active();
-			 cell != triangulation.end(); ++cell)
-		 {
-			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-			  if (cell->face(face)->at_boundary())
-				  cell->face(face)->set_all_boundary_ids(0);
-		 }
+		// Clear all existing boundary ID's
+		 numEx::clear_boundary_IDs( triangulation );
 
 		// Set boundary IDs and and manifolds
 		 for (typename Triangulation<dim>::active_cell_iterator
@@ -883,5 +902,40 @@ namespace Rod
 	//			grid_out.write_ucd(triangulation, out_ucd);
 	//			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
 	//		}
+	}
+
+	template <int dim>
+	void assemble_contact
+	(
+			const typename DoFHandler<dim>::active_cell_iterator &cell,
+			const double &penalty_stiffness,
+			const FESystem<dim> &fe,
+			FEFaceValues<dim> &fe_face_values_ref,
+			const FEValuesExtractors::Vector u_fe,
+			const unsigned int n_q_points_f,
+			const Vector<double> &current_solution,
+			std::vector< std::shared_ptr< PointHistory<dim> > > lqph,
+			const std::vector<types::global_dof_index> local_dof_indices,
+			FullMatrix<double> &cell_matrix,
+			Vector<double> &cell_rhs
+	)
+	{
+//		// Assemble the contact pair
+//		assemble_contact(
+//							cell,
+//							rigid_wall,
+//							{enums::id_boundary_yPlus,enums::id_boundary_zPlus},
+////							enums::id_boundary_yPlus,
+//							penalty_stiffness,
+//							fe,
+//							fe_face_values_ref,
+//							u_fe,
+//							n_q_points_f,
+//							current_solution,
+//							lqph,
+//							local_dof_indices,
+//							cell_matrix,
+//							cell_rhs
+//						 );
 	}
 }
