@@ -18,7 +18,7 @@ using namespace dealii;
 namespace Rod
 /*
  * 1/8 of a notched rod in 3D and the axisymmetric half-model in 2D
- *
+ * @BUG: The elements for refine_special=3 in the neck do not follow the manifold as the coarser cells do
  * CERTIFIED TO STANDARD numExS07 (200724)
  */
 {
