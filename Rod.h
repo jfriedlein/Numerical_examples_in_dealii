@@ -103,6 +103,7 @@ namespace Rod
 		 {
 			// First we create a cylinder
 			 Triangulation<dim> tria_full_cylinder;
+			 // @todo Use the new subdivided_cylinder function from deal.ii
 			 GridGenerator::cylinder(tria_full_cylinder, radius, half_length);
 
 			// Let's first refine the "cylinder" ones, because the initial mesh is a brick
@@ -452,21 +453,8 @@ namespace Rod
 		 if ( std::abs( parameter.ratio_x - 1. ) > 1e-10 )
 			 numEx::notch_body( triangulation, half_notch_length, radius, notch_radius, R, notch_type, true );
 
-//		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-//		{
-//			std::ofstream out ("grid-3d_quarter_plate_merged.eps");
-//			GridOut grid_out;
-//			grid_out.write_eps (triangulation, out);
-//			std::cout << "Grid written to grid-3d_quarter_plate_merged.eps" << std::endl;
-//		}
-//		{
-//			std::ofstream out_ucd("Grid-3d_quarter_plate_merged.inp");
-//			GridOut grid_out;
-//			GridOutFlags::Ucd ucd_flags(true,true,true);
-//			grid_out.set_flags(ucd_flags);
-//			grid_out.write_ucd(triangulation, out_ucd);
-//			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
-//		}
+		// Output the triangulation as eps or inp
+		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
 
 		// Evaluation points and the related list of them
 		 numEx::EvalPointClass<dim> eval_center ( Point<3>(notch_radius,0,0), enums::x );
@@ -521,6 +509,7 @@ namespace Rod
 					AssertThrow(parameter.nbr_holeEdge_refinements>0, ExcMessage("Rod<< Mesh not implemented for only 4 elements in total. Please increase the nbr_holeEdge_refinements to at least 1."));
 
 				GridGenerator::hyper_rectangle(triangulation, p1, p2);
+
 				// Let's first refine the "cylinder" ones, because the initial mesh is a brick
 				 triangulation.refine_global( 2 );
 			}
@@ -530,18 +519,15 @@ namespace Rod
 				 repetitions[enums::x] = 1;
 				 repetitions[enums::y] = 4;
 				 GridGenerator::subdivided_hyper_rectangle(triangulation, repetitions, p1, p2);
+
+//				 Tensor<1,dim> shift_vector;
+//				 shift_vector[enums::x]=2;
+//				 GridTools::shift(shift_vector,triangulation);
 			}
 		 }
 
-		// Clear boundary ID's
-		for (typename Triangulation<dim>::active_cell_iterator
-			 cell = triangulation.begin_active();
-			 cell != triangulation.end(); ++cell)
-		{
-			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-			  if (cell->face(face)->at_boundary())
-				  cell->face(face)->set_all_boundary_ids(0);
-		}
+		// Clear all existing boundary ID's
+		 numEx::clear_boundary_IDs( triangulation );
 
 		// Set boundary IDs and and manifolds
 		for (typename Triangulation<dim>::active_cell_iterator
@@ -644,22 +630,8 @@ namespace Rod
 
 		 eval_points_list = {eval_center,eval_top};
 
-		// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-//		{
-//			std::ofstream out ("grid-3d_quarter_plate_merged.eps");
-//			GridOut grid_out;
-//			grid_out.write_eps (triangulation, out);
-//			std::cout << "Grid written to grid-3d_quarter_plate_merged.eps" << std::endl;
-//			AssertThrow(false,ExcMessage("done"));
-//		}
-//		{
-//			std::ofstream out_ucd("Grid-3d_quarter_plate_merged.inp");
-//			GridOut grid_out;
-//			GridOutFlags::Ucd ucd_flags(true,true,true);
-//			grid_out.set_flags(ucd_flags);
-//			grid_out.write_ucd(triangulation, out_ucd);
-//			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
-//		}
+		// Output the triangulation as eps or inp
+		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
 	}
 
 
@@ -743,6 +715,7 @@ namespace Rod
 		 {
 			// First we create a cylinder
 			 Triangulation<dim> tria_full_cylinder;
+			 // @todo Use the new subdivided_cylinder function from deal.ii
 			 GridGenerator::cylinder(tria_full_cylinder, radius, half_length);
 
 			// Let's first refine the "cylinder" ones, because the initial mesh is a brick
