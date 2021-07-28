@@ -66,7 +66,10 @@ namespace enums
 		Rod_refine_special_uniform = 1,
 		Mesh_refine_special_innermost = 2,
 		Mesh_refine_special_Simo = 3,
-		Mesh_refine_uniform = 4
+		Mesh_refine_uniform = 4,
+		Mesh_refine_none = 99,
+		Mesh_refine_beam_fineCoarseBrick = 1,
+		Mesh_refine_beam_nx1 = 2
 	};
     
     enum enum_coord
@@ -106,7 +109,8 @@ namespace enums
 	   BC_sym = 1, //!< BC_sym
 	   BC_fix = 2, //!< BC_fix
 	   BC_x0 = 3,  //!< BC_x0
-	   BC_x0_z0 = 4   //!< BC_x0_z0
+	   BC_x0_z0 = 4,   //!< BC_x0_z0
+	   BC_y0 = 5   //!< BC_y0
    };
 }
 
