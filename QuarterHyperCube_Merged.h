@@ -35,6 +35,9 @@ namespace QuarterHyperCube_Merged
 	  const enums::enum_BC BC_xMinus = enums::BC_sym;
 	  const enums::enum_BC BC_xPlus = enums::BC_none;
 
+	// Evaluation point
+	 Point<3> eval_point;
+
 	 // DENP
 //	  const enums::enum_BC BC_xMinus = enums::BC_none;
 //	  const enums::enum_BC BC_xPlus = enums::BC_sym;
@@ -111,6 +114,10 @@ namespace QuarterHyperCube_Merged
 		const double width =  2.0*half_width;
 		const double hole_diameter = 2.0*hole_radius;
 		const double internal_width = hole_diameter + hole_division_fraction*(width - hole_diameter);
+
+		// Set the evaluation point in the top right corner
+		 eval_point[enums::x] = half_width;
+		 eval_point[enums::y] = half_length;
 
 		Triangulation<2> tria_quarter_plate_hole;
 		{
@@ -573,17 +580,11 @@ namespace QuarterHyperCube_Merged
 										   parameter.thickness/2.0,
 										   triangulation);
 
-		// Clear boundary ID's
-		for (typename Triangulation<dim>::active_cell_iterator
-			 cell = triangulation.begin_active();
-			 cell != triangulation.end(); ++cell )
-		{
-			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
-			  if (cell->face(face)->at_boundary())
-			  {
-				  cell->face(face)->set_all_boundary_ids(0);
-			  }
-		}
+		// Set the evaluation point's z-coordinate
+		 eval_point[enums::z] = parameter.thickness/2.0;
+
+		// Clear all existing boundary ID's
+		 numEx::clear_boundary_IDs( triangulation );
 
 		// Set boundary IDs and and manifolds
 		const Point<dim> direction (0,0,1);
@@ -664,7 +665,6 @@ namespace QuarterHyperCube_Merged
 
 		static SphericalManifold<dim> spherical_manifold (centre);
 		triangulation.set_manifold(parameters_internal.manifold_id_hole,spherical_manifold);
-
 
 		// Pre-refinement (local refinements) of the damaged area (around y=0)
 		for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
