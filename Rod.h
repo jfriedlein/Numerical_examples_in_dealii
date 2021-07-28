@@ -25,10 +25,12 @@ namespace Rod
 	// The loading direction: \n
 	// In which coordinate direction the load shall be applied, so x/y/z.
 	 const unsigned int loading_direction = enums::y;
+//	 const unsigned int loading_direction = enums::x;
 
 	// The loaded faces:
 	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus;
 	 //const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_xPlus;
+//	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_xMinus; // internal pressure for pipe
 
 	// Here you can choose between a radial notch (smooth dent) and a sharp triangular notch (viewed in the cross section)
 	// USER parameter
@@ -37,14 +39,24 @@ namespace Rod
 
 	// BC
 //	 const enums::enum_BC BC_yPlus  = enums::BC_x0_z0; // special: no contraction of loaded face
-	 const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard
+	 const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard: free
+//	 const enums::enum_BC BC_yPlus  = enums::BC_y0; // special: symmetry condition
+
+	 const enums::enum_BC BC_xMinus  = enums::BC_x0; // symmetry
+//	 const enums::enum_BC BC_xMinus  = enums::BC_none; // free
+
+//	 const enums::enum_BC BC_xPlus  = enums::BC_x0;
+	 const enums::enum_BC BC_xPlus  = enums::BC_none; // free
+
+
+	 const bool shift_mesh = false;
 
 	// Some internal parameters
 	 struct parameterCollection
 	 {
 		const types::manifold_id manifold_id_surf = 10;
 
-		const double search_tolerance = 1e-12;
+		const double search_tolerance = 1e-8;
 	 };
 
 	// Evaluation points: \n
@@ -513,16 +525,16 @@ namespace Rod
 				// Let's first refine the "cylinder" ones, because the initial mesh is a brick
 				 triangulation.refine_global( 2 );
 			}
-			else if ( parameter.refine_special == enums::Rod_refine_special_uniform )
+			else if ( parameter.refine_special == enums::Rod_refine_special_uniform || parameter.refine_special == enums::Mesh_refine_special_Simo )
 			{
 				 std::vector< unsigned int > repetitions (dim);
 				 repetitions[enums::x] = 1;
 				 repetitions[enums::y] = 4;
 				 GridGenerator::subdivided_hyper_rectangle(triangulation, repetitions, p1, p2);
-
-//				 Tensor<1,dim> shift_vector;
-//				 shift_vector[enums::x]=2;
-//				 GridTools::shift(shift_vector,triangulation);
+			}
+			else if ( parameter.refine_special == enums::Mesh_refine_none )
+			{
+				GridGenerator::subdivided_hyper_rectangle(triangulation, {4,1}, p1, p2);
 			}
 		 }
 
@@ -538,18 +550,30 @@ namespace Rod
 			 // Cells that describe the boundary can only describe the boundary when they possess a face that lies at the boundary:
 			  if (cell->face(face)->at_boundary())
 			  {
-				// Cell at the x0-plane
+				// Faces at the x0-plane
 				 if (std::abs(cell->face(face)->center()[x] - 0.0) < search_tolerance)
 					cell->face(face)->set_boundary_id(enums::id_boundary_xMinus);
-				// Cell at the y0-plane
+				// Faces at right end
+				 else if (std::abs(cell->face(face)->center()[x] - radius) < search_tolerance)
+					cell->face(face)->set_boundary_id(enums::id_boundary_xPlus);
+				// Faces at the y0-plane
 				 else if (std::abs(cell->face(face)->center()[y] - 0.0) < search_tolerance)
-						cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
-				// Cell at the other end of the rod
+					cell->face(face)->set_boundary_id(enums::id_boundary_yMinus);
+				// Faces at the other y-end of the rod
 				 else if (std::abs(cell->face(face)->center()[y] - half_length) < search_tolerance)
-						cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
+					cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
 			  }
 		}
 
+		// Shift the mesh after we have identified the boundary ids,
+		// so the determination is still independent of the actual shift
+		 if ( shift_mesh )
+		 {
+			// Shift mesh to create e.g. a pipe
+			 Tensor<1,dim> shift_vector;
+			 shift_vector[enums::x]=4;//4;
+			 GridTools::shift(shift_vector,triangulation);
+		 }
 
 		if ( parameter.refine_special == enums::Mesh_refine_special_standard )
 		{
@@ -615,7 +639,25 @@ namespace Rod
 		}
 		else if ( parameter.refine_special == enums::Rod_refine_special_uniform )
 		{
-			 triangulation.refine_global( 2 );
+//			 triangulation.refine_global( 2 );
+		}
+		else if ( parameter.refine_special == enums::Mesh_refine_special_Simo )
+		{
+			 for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
+			 {
+				for (typename Triangulation<dim>::active_cell_iterator
+				   cell = triangulation.begin_active();
+				   cell != triangulation.end(); ++cell)
+				{
+					for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
+						if ( cell->face(face)->at_boundary() && cell->face(face)->boundary_id()==enums::id_boundary_yMinus )
+							{
+								cell->set_refine_flag(RefinementCase<dim>::cut_y); // refine only in the y-direction
+								break;
+							}
+				}
+				triangulation.execute_coarsening_and_refinement();
+			 }
 		}
 
 		// Generate the notch
@@ -641,7 +683,12 @@ namespace Rod
 							const Parameter::GeneralParameters &parameter)
 	{
 		// BC on x0 plane
-		 numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		 if ( BC_xMinus==enums::BC_x0 )
+			numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+
+		// BC on xPlus plane
+		 if ( BC_xPlus==enums::BC_x0 )
+			numEx::BC_apply( enums::id_boundary_xPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 		// BC on y0 plane
 		 numEx::BC_apply( enums::id_boundary_yMinus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
@@ -656,6 +703,8 @@ namespace Rod
 			numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 			numEx::BC_apply( enums::id_boundary_yPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 		 }
+		 else if ( BC_yPlus==enums::BC_y0 )
+			numEx::BC_apply( enums::id_boundary_yPlus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 		// BC for the load ...
 		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver
@@ -666,6 +715,8 @@ namespace Rod
 //				rigid_wall->move( current_load_increment );
 //	 	 }
 	}
+
+
 
 	// 3d grid
 	/*
