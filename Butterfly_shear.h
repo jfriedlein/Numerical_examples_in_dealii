@@ -68,10 +68,11 @@ namespace Butterfly_shear
 		// ToDo-assure: the use the values from the parameter file
 		// _b: body of butterfly
 		// _w: wing of butterfly
-		const double width_b = 2.; //parameter.width;
-		const double height_b = 5.;// parameter.height;
-		const double width_w = 5.; // wing width
-		const double height_w = 15.; // wing height
+		const double total_width = parameter.width;
+		const double width_b = parameter.notchWidth; // 2 //parameter.width;
+		const double height_b = parameter.ratio_x; // 5 // parameter.height;
+		const double width_w = (total_width-width_b) / 2.; // 5 // wing width
+		const double height_w = parameter.height; // 15 // wing height
 
 		const double aux_ratio = (height_w-height_b)/(2.*width_w);
 		const double notch_radius = width_b/2. / (aux_ratio/std::sqrt(1+aux_ratio*aux_ratio));
