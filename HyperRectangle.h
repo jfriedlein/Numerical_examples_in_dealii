@@ -308,7 +308,7 @@ namespace HyperRectangle
 		 const double length = parameter.height;
 		 body_dimensions[enums::y] = length;
 
-		 const double notch_y_right = length/2.+width/2.;
+		 const double notch_y_right = 0;//length/2.+width/2.;
 		 const double notch_y_left = length/2.-width/2.;
 
 		// notching
@@ -319,7 +319,7 @@ namespace HyperRectangle
 		  Point<3> face_normal1(1.,0,0);
 		  double notch_depth = (1.-notch_reduction)*width;
 
-		  numEx::NotchClass<2> notch1 ( enums::notch_round, parameter.notchWidth, notch_depth, notch_reference_point1, enums::id_boundary_xPlus,
+		  numEx::NotchClass<2> notch1 ( enums::notch_linear, parameter.notchWidth, notch_depth, notch_reference_point1, enums::id_boundary_xPlus,
 										face_normal1, enums::y, manifold_id_notch_right );
 
 		 // Second notch on the left
@@ -355,18 +355,18 @@ namespace HyperRectangle
 		 }
 		 else
 		 {
-//			 for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
-//			 {
-//				for (typename Triangulation<dim>::active_cell_iterator
-//							 cell = triangulation.begin_active();
-//							 cell != triangulation.end(); ++cell)
-//				{
-//						// Find all cells that lay in an exemplary damage band with size 1/4 from the y=0 face
-//						if ( std::abs( cell->center()[enums::y] -  < length_refined )
-//							cell->set_refine_flag();
-//				} // end for(cell)
-//				triangulation.execute_coarsening_and_refinement();
-//			 }
+			 for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
+			 {
+				for (typename Triangulation<dim>::active_cell_iterator
+							 cell = triangulation.begin_active();
+							 cell != triangulation.end(); ++cell)
+				{
+						// Find all cells that lay in an exemplary damage band with size 1/4 from the y=0 face
+						if ( cell->center()[enums::y] < width )
+							cell->set_refine_flag();
+				} // end for(cell)
+				triangulation.execute_coarsening_and_refinement();
+			 }
 		}
 	}
 	
