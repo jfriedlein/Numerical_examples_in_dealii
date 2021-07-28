@@ -570,21 +570,7 @@ namespace SingleEdgeNotchedPlate
 				}
 		}
 
-
-		// Include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-//		{
-//			std::ofstream out ("grid-3d_quarter_plate_merged.eps");
-//			GridOut grid_out;
-//			grid_out.write_eps (triangulation, out);
-//			std::cout << "Grid written to grid-3d_quarter_plate_merged.eps" << std::endl;
-//		}
-//		{
-//			std::ofstream out_ucd("Grid-3d_quarter_plate_merged.inp");
-//			GridOut grid_out;
-//			GridOutFlags::Ucd ucd_flags(true,true,true);
-//			grid_out.set_flags(ucd_flags);
-//			grid_out.write_ucd(triangulation, out_ucd);
-//			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
-//		}
+		// Output the triangulation as eps or inp
+		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
 	}
 }
