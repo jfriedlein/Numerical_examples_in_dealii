@@ -86,7 +86,7 @@ namespace HyperCube
 //	  std::shared_ptr<HalfWallRigid<2>> rigid_wall = std::shared_ptr<HalfWallRigid<2>>(new HalfWallRigid<2>( {wall_point_on_plane,wall_normal_unit_vector,wall_normal_unit_vector} , {-1} ));
 
 	 // Sphere
-	  Point<2> punch_center = Point<2>(0.0,3.0);
+	  Point<2> punch_center = Point<2>(0.0,2.0);
 	  const Point<2> punch_loading_vector = Point<2>(0.,-1.);
 	  std::shared_ptr<SphereRigid<2>> rigid_wall = std::shared_ptr<SphereRigid<2>>(new SphereRigid<2>( {punch_center,punch_loading_vector,punch_loading_vector}, {1.0,0,0} ));
 
@@ -365,7 +365,7 @@ namespace HyperCube
 					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
 					  if ( (cell->vertex(vertex)).distance(corner_rightBottom)<1e-12 )
 					  {
-						  cell->vertex(vertex)[enums::x] -= 0.1;
+						  cell->vertex(vertex)[enums::x] += 0.5;
 						  break;
 					  }
 				}
@@ -397,7 +397,7 @@ namespace HyperCube
 		assemble_contact(
 							cell,
 							rigid_wall,
-							enums::id_boundary_yPlus,
+							{enums::id_boundary_yPlus},
 							penalty_stiffness,
 							fe,
 							fe_face_values_ref,
