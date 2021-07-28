@@ -406,44 +406,27 @@ namespace SphereRigid_Cube
 			Vector<double> &cell_rhs
 	)
 	{
-		// Assemble the punch
-		assemble_contact(
-							cell,
-							rigid_punch,
-							enums::id_boundary_yPlus,
-							penalty_stiffness,
-							fe,
-							fe_face_values_ref,
-							u_fe,
-							n_q_points_f,
-							current_solution,
-							lqph,
-							local_dof_indices,
-							cell_matrix,
-							cell_rhs
-						 );
-
-		// Assemble the left die
-		assemble_contact(
-							cell,
-							rigid_die,
-							enums::id_boundary_yMinus,
-							penalty_stiffness,
-							fe,
-							fe_face_values_ref,
-							u_fe,
-							n_q_points_f,
-							current_solution,
-							lqph,
-							local_dof_indices,
-							cell_matrix,
-							cell_rhs
-						 );
-
-		// Assemble the bottom wall
+//		// Assemble the punch
 //		assemble_contact(
 //							cell,
-//							rigid_bottom,
+//							rigid_punch,
+//							enums::id_boundary_yPlus,
+//							penalty_stiffness,
+//							fe,
+//							fe_face_values_ref,
+//							u_fe,
+//							n_q_points_f,
+//							current_solution,
+//							lqph,
+//							local_dof_indices,
+//							cell_matrix,
+//							cell_rhs
+//						 );
+//
+//		// Assemble the left die
+//		assemble_contact(
+//							cell,
+//							rigid_die,
 //							enums::id_boundary_yMinus,
 //							penalty_stiffness,
 //							fe,
@@ -451,44 +434,61 @@ namespace SphereRigid_Cube
 //							u_fe,
 //							n_q_points_f,
 //							current_solution,
+//							lqph,
 //							local_dof_indices,
 //							cell_matrix,
 //							cell_rhs
 //						 );
-
-
-		// Assemble the Niederhalter
-		assemble_contact(
-							cell,
-							rigid_holder,
-							enums::id_boundary_yPlus2,
-							penalty_stiffness,
-							fe,
-							fe_face_values_ref,
-							u_fe,
-							n_q_points_f,
-							current_solution,
-							lqph,
-							local_dof_indices,
-							cell_matrix,
-							cell_rhs
-						 );
-
-		// Assemble the support
-		assemble_contact(
-							cell,
-							rigid_support,
-							enums::id_boundary_yMinus,
-							penalty_stiffness,
-							fe,
-							fe_face_values_ref,
-							u_fe,
-							n_q_points_f,
-							current_solution,
-							lqph,
-							local_dof_indices,
-							cell_matrix,
-							cell_rhs
-						 );
+//
+//		// Assemble the bottom wall
+////		assemble_contact(
+////							cell,
+////							rigid_bottom,
+////							enums::id_boundary_yMinus,
+////							penalty_stiffness,
+////							fe,
+////							fe_face_values_ref,
+////							u_fe,
+////							n_q_points_f,
+////							current_solution,
+////							local_dof_indices,
+////							cell_matrix,
+////							cell_rhs
+////						 );
+//
+//
+//		// Assemble the Niederhalter
+//		assemble_contact(
+//							cell,
+//							rigid_holder,
+//							enums::id_boundary_yPlus2,
+//							penalty_stiffness,
+//							fe,
+//							fe_face_values_ref,
+//							u_fe,
+//							n_q_points_f,
+//							current_solution,
+//							lqph,
+//							local_dof_indices,
+//							cell_matrix,
+//							cell_rhs
+//						 );
+//
+//		// Assemble the support
+//		assemble_contact(
+//							cell,
+//							rigid_support,
+//							enums::id_boundary_yMinus,
+//							penalty_stiffness,
+//							fe,
+//							fe_face_values_ref,
+//							u_fe,
+//							n_q_points_f,
+//							current_solution,
+//							lqph,
+//							local_dof_indices,
+//							cell_matrix,
+//							cell_rhs
+//						 );
 	}
 }
