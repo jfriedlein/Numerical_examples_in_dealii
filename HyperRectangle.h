@@ -371,7 +371,7 @@ namespace HyperRectangle
 	}
 	
 
-// 3d grid
+	// 3d grid
 	template<int dim>
 	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
@@ -435,7 +435,7 @@ namespace HyperRectangle
 				{
 					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
 					{
-						// Find all cells that lay in an exemplary damage band with size 1/4 from the y=0 face
+						// Find all cells that lay in an exemplary damage band with the given size from the y=0 face
 						if ( cell->vertex(vertex)[enums::y] < std::min( 1.*width, 0.9 * length ) )
 						{
 							if ( nbr_local_ref>=1 )
