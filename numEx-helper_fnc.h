@@ -69,7 +69,10 @@ namespace enums
 		Mesh_refine_uniform = 4,
 		Mesh_refine_none = 99,
 		Mesh_refine_beam_fineCoarseBrick = 1,
-		Mesh_refine_beam_nx1 = 2
+		Mesh_refine_beam_nx1 = 2,
+		Mesh_Rod_Upsetting_tapered = 10,
+		Mesh_Rod_ax_ratio_EL = 11,
+		Mesh_HyperRectangle_coarse_and_fine_brick = 12
 	};
     
     enum enum_coord
@@ -452,7 +455,7 @@ namespace numEx
 			   cell != triangulation.end(); ++cell)
 			 {
 				  for (unsigned int face=0; face < GeometryInfo<dim>::faces_per_cell; ++face)
-					  if (cell->face(face)->at_boundary() && cell->face(face)->boundary_id()==notch.face_BID )
+					  if ( cell->face(face)->at_boundary() && cell->face(face)->boundary_id()==notch.face_BID )
 						  for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_face; ++vertex)
 						  {
 							  // Distance from the given vertex to the reference point \a POS of the notch. We can directly
@@ -604,7 +607,7 @@ namespace numEx
 	 */
 	template <int dim>
 	void notch_body( Triangulation<dim> &triangulation, const double &half_notch_length, const double &radius, const double &notch_radius,
-					 const double &R, const unsigned int notch_type, const bool geom_cylindrical=false )
+					 const double &R, const unsigned int notch_type, const bool geom_cylindrical=false, const double offset=0. )
 	{
 		enum enum_coord_directions
 		{
@@ -625,7 +628,7 @@ namespace numEx
 				  for (unsigned int vertex=0; vertex<GeometryInfo<dim>::vertices_per_cell; ++vertex)
 				  {
 					  // We look for all the points that lie in the notched area (y-coord in half length of notch)
-					   double y_coord = cell->vertex(vertex)[y];
+					   double y_coord = std::abs( offset - cell->vertex(vertex)[y] );
 					   unsigned int index_vertex = cell->vertex_index(vertex);
 					   if ( y_coord < half_notch_length && (std::find(index_list.begin(), index_list.end(), index_vertex) == index_list.end()) )
 					   {
