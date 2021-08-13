@@ -141,15 +141,10 @@ namespace PlateWithAHole
 		// For some reason the flatten_triangulation needs to be done, else we got problems for some types of local refinements
 		 GridGenerator::flatten_triangulation(tria_2d,tria_2d_out);
 
-		// include the following scope to see directly how the variation of the input parameters changes the geometry of the grid
-
-//		{
-//			std::ofstream out ("grid-tria_2d.eps");
-//			GridOut grid_out;
-//			grid_out.write_eps (tria_2d, out);
-//			std::cout << "Grid written to grid-tria_2d.eps" << std::endl;
-//		}
+		// Output the triangulation as eps or inp
+		 numEx::output_triangulation( tria_2d_out, enums::output_eps, numEx_name );
 	}
+
 
 // 2D grid
 	template <int dim>
@@ -259,7 +254,7 @@ namespace PlateWithAHole
 						 cell = triangulation.begin_active();
 						 cell != triangulation.end(); ++cell)
 			{
-				if ( std::abs( cell->center()[enums::y]) < holeRadius*0.75 )
+				if ( std::abs( cell->center()[enums::y]) < holeRadius*0.9 )
 					cell->set_refine_flag();
 			}
 			triangulation.execute_coarsening_and_refinement();
