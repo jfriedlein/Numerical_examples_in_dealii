@@ -38,16 +38,19 @@ namespace Rod
 	 const enums::enum_notch_type notch_type = enums::notch_linear;
 
 	// BC
-//	 const enums::enum_BC BC_yPlus  = enums::BC_x0_z0; // special: no contraction of loaded face
-	 const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard: free
-//	 const enums::enum_BC BC_yPlus  = enums::BC_y0; // special: symmetry condition
+	 // always
+	  const enums::enum_BC BC_xMinus  = enums::BC_x0; // symmetry
+	  const enums::enum_BC BC_xPlus  = enums::BC_none; // free
 
-	 const enums::enum_BC BC_xMinus  = enums::BC_x0; // symmetry
-//	 const enums::enum_BC BC_xMinus  = enums::BC_none; // free
+	 // NoaR
+	  const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard: free
 
-//	 const enums::enum_BC BC_xPlus  = enums::BC_x0;
-	 const enums::enum_BC BC_xPlus  = enums::BC_none; // free
+	 // Disk upsetting (sticking)
+//	  const enums::enum_BC BC_yPlus  = enums::BC_x0_z0; // special: no contraction of loaded face, sticking contact
 
+	 // special
+//	  const enums::enum_BC BC_yPlus  = enums::BC_y0; // special: symmetry condition
+//	  const enums::enum_BC BC_xMinus  = enums::BC_none; // free
 
 	 const bool shift_mesh = false;
 
@@ -536,16 +539,27 @@ namespace Rod
 			{
 				GridGenerator::subdivided_hyper_rectangle(triangulation, {4,1}, p1, p2);
 			}
+			else if ( parameter.refine_special == enums::Mesh_Rod_Upsetting_tapered )
+			{
+				// The number of elements are chosen to match the tapering exactly
+				 GridGenerator::subdivided_hyper_rectangle(triangulation, {10,15}, p1, p2);
+			}
+			else if ( parameter.refine_special == enums::Mesh_Rod_ax_ratio_EL )
+			{
+				const unsigned int n_elements_x = parameter.nbr_elementsInZ*parameter.grid_y_repetitions;
+				const unsigned int n_elements_y = parameter.grid_y_repetitions;
+				 GridGenerator::subdivided_hyper_rectangle(triangulation, {n_elements_x,n_elements_y}, p1, p2);
+			}
 		 }
 
 		// Clear all existing boundary ID's
 		 numEx::clear_boundary_IDs( triangulation );
 
 		// Set boundary IDs and and manifolds
-		for (typename Triangulation<dim>::active_cell_iterator
+		 for (typename Triangulation<dim>::active_cell_iterator
 			 cell = triangulation.begin_active();
 			 cell != triangulation.end(); ++cell)
-		{
+		 {
 			for (unsigned int face=0; face<GeometryInfo<dim>::faces_per_cell; ++face)
 			 // Cells that describe the boundary can only describe the boundary when they possess a face that lies at the boundary:
 			  if (cell->face(face)->at_boundary())
@@ -563,7 +577,7 @@ namespace Rod
 				 else if (std::abs(cell->face(face)->center()[y] - half_length) < search_tolerance)
 					cell->face(face)->set_boundary_id(enums::id_boundary_yPlus);
 			  }
-		}
+		 }
 
 		// Shift the mesh after we have identified the boundary ids,
 		// so the determination is still independent of the actual shift
@@ -659,18 +673,56 @@ namespace Rod
 				triangulation.execute_coarsening_and_refinement();
 			 }
 		}
+		else if ( parameter.refine_special == enums::Mesh_Rod_ax_ratio_EL )
+		{
+			 for (unsigned int refine_counter=0; refine_counter<parameter.nbr_holeEdge_refinements; refine_counter++)
+			 {
+				for (typename Triangulation<dim>::active_cell_iterator
+				   cell = triangulation.begin_active();
+				   cell != triangulation.end(); ++cell)
+				{
+					if ( cell->center()[enums::x] > radius*0.9 )
+					{
+						cell->set_refine_flag();
+					}
+				}
+				triangulation.execute_coarsening_and_refinement();
+			 }
+		}
 
 		// Generate the notch
-		 numEx::notch_body( triangulation, half_notch_length, radius, notch_radius, R, notch_type, true );
+		if ( true /*standard taper*/)
+		{
+			 numEx::notch_body( triangulation, half_notch_length, radius, notch_radius, R, notch_type, true );
+
+			// Evaluation points and the related list of them
+			 numEx::EvalPointClass<3> eval_center ( Point<3>(notch_radius,0,0), enums::x );
+			 numEx::EvalPointClass<3> eval_top ( Point<3>(radius,half_length,0), enums::x );
+			 eval_points_list = {eval_center,eval_top};
+		}
+		else // @todo What is this?
+		{
+//			  const double notch_reduction = parameter.ratio_x;
+//			  Point<3> notch_reference_point1 ( radius, half_length, 0);
+//			  Point<3> face_normal1(1.,0,0);
+//			  double notch_depth = (1.-notch_reduction)*radius;
+//
+//			  numEx::NotchClass<2> notch1 ( enums::notch_linear, parameter.notchWidth, notch_depth, notch_reference_point1, enums::id_boundary_xPlus,
+//											face_normal1, enums::y);
+//
+//			  numEx::notch_body( triangulation, notch1 );
+
+			 const double offset = half_length;
+			 numEx::notch_body( triangulation, half_notch_length, radius, notch_radius, R, notch_type, true, offset );
+
+			// Evaluation points and the related list of them
+			 numEx::EvalPointClass<3> eval_center ( Point<3>(radius,0,0), enums::x );
+			 numEx::EvalPointClass<3> eval_top ( Point<3>(0,half_length,0), enums::x );
+			 eval_points_list = {eval_center,eval_top};
+		}
 
 		// Possibly some additional global isotropic refinements
 		 triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
-
-		// Evaluation points and the related list of them
-		 numEx::EvalPointClass<3> eval_center ( Point<3>(notch_radius,0,0), enums::x );
-		 numEx::EvalPointClass<3> eval_top ( Point<3>(radius,half_length,0), enums::x );
-
-		 eval_points_list = {eval_center,eval_top};
 
 		// Output the triangulation as eps or inp
 		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
@@ -701,7 +753,8 @@ namespace Rod
 		 if ( BC_yPlus==enums::BC_x0_z0 ) // no contraction
 		 {
 			numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-			numEx::BC_apply( enums::id_boundary_yPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+			if ( dim==3 )
+				numEx::BC_apply( enums::id_boundary_yPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 		 }
 		 else if ( BC_yPlus==enums::BC_y0 )
 			numEx::BC_apply( enums::id_boundary_yPlus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
