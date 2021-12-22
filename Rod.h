@@ -24,13 +24,12 @@ namespace Rod
 {
 	// The loading direction: \n
 	// In which coordinate direction the load shall be applied, so x/y/z.
-	 const unsigned int loading_direction = enums::y;
-//	 const unsigned int loading_direction = enums::x;
+//	 const unsigned int loading_direction = enums::y; // NoaR and Disk upsetting
+	 const unsigned int loading_direction = enums::x; // hole bulging
 
 	// The loaded faces:
-	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus;
-	 //const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_xPlus;
-//	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_xMinus; // internal pressure for pipe
+//	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus; // NoaR and Disk upsetting
+	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_xMinus; // hole bulging
 
 	// Here you can choose between a radial notch (smooth dent) and a sharp triangular notch (viewed in the cross section)
 	// USER parameter
@@ -39,20 +38,26 @@ namespace Rod
 
 	// BC
 	 // always
-	  const enums::enum_BC BC_xMinus  = enums::BC_x0; // symmetry
 	  const enums::enum_BC BC_xPlus  = enums::BC_none; // free
 
+	 // NoaR and Disk upsetting
+//	  const enums::enum_BC BC_xMinus  = enums::BC_x0; // symmetry
+
 	 // NoaR
-	  const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard: free
+//	  const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard: free
 
 	 // Disk upsetting (sticking)
 //	  const enums::enum_BC BC_yPlus  = enums::BC_x0_z0; // special: no contraction of loaded face, sticking contact
+
+	 // hole bulging
+	  const enums::enum_BC BC_xMinus = enums::BC_y0;
+	  const enums::enum_BC BC_yPlus = enums::BC_none;
 
 	 // special
 //	  const enums::enum_BC BC_yPlus  = enums::BC_y0; // special: symmetry condition
 //	  const enums::enum_BC BC_xMinus  = enums::BC_none; // free
 
-	 const bool shift_mesh = false;
+	 const bool shift_mesh = true;  // hole bulging
 
 	// Some internal parameters
 	 struct parameterCollection
@@ -585,7 +590,7 @@ namespace Rod
 		 {
 			// Shift mesh to create e.g. a pipe
 			 Tensor<1,dim> shift_vector;
-			 shift_vector[enums::x]=4;//4;
+			 shift_vector[enums::x]=2;
 			 GridTools::shift(shift_vector,triangulation);
 		 }
 
@@ -681,7 +686,8 @@ namespace Rod
 				   cell = triangulation.begin_active();
 				   cell != triangulation.end(); ++cell)
 				{
-					if ( cell->center()[enums::x] > radius*0.9 )
+					//if ( cell->center()[enums::x] > radius*0.9 )
+					if ( cell->center()[enums::x] < 6. ) // Hole bulging
 					{
 						cell->set_refine_flag();
 					}
@@ -697,7 +703,8 @@ namespace Rod
 
 			// Evaluation points and the related list of them
 			 numEx::EvalPointClass<3> eval_center ( Point<3>(notch_radius,0,0), enums::x );
-			 numEx::EvalPointClass<3> eval_top ( Point<3>(radius,half_length,0), enums::x );
+			 numEx::EvalPointClass<3> eval_top ( Point<3>(2,0,0), enums::x );
+//			 numEx::EvalPointClass<3> eval_top ( Point<3>(radius,half_length,0), enums::x ); // NoaR, Disk upsetting
 			 eval_points_list = {eval_center,eval_top};
 		}
 		else // @todo What is this?
@@ -737,6 +744,8 @@ namespace Rod
 		// BC on x0 plane
 		 if ( BC_xMinus==enums::BC_x0 )
 			numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		 else if ( BC_xMinus==enums::BC_y0 )
+			numEx::BC_apply( enums::id_boundary_xMinus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 		// BC on xPlus plane
 		 if ( BC_xPlus==enums::BC_x0 )
