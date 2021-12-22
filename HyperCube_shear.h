@@ -117,40 +117,45 @@ namespace HyperCube_shear
 		// BC for the load ...
 		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver, alternatively  ...
 		 {
-			 // symmetric shear [Heiduschke]
-			 const double load = current_load_step*parameter.AL_initial_increment;
-			 const double load_last = load - parameter.AL_initial_increment;
-			 const double width = 1.;
-			 const double height = 1.;
-			 const double Delta_u2 = width * ( 1./std::sqrt(std::cos(load)) - 1./std::sqrt(std::cos(load_last)) );
-			 const double Delta_u4 = width * ( std::sin(load)/std::sqrt(std::cos(load)) - std::sin(load_last)/std::sqrt(std::cos(load_last)) );
-			 const double Delta_u5 = width * ( std::sqrt(std::cos(load)) - std::sqrt(std::cos(load_last)) );
-			 const double Delta_u6 = Delta_u2 + Delta_u4;
-			 const double Delta_u7 = Delta_u5;
-
-			 // First, add lines to the constraints matrix
-			  for ( unsigned int i=0; i<8; i++)
-				 constraints.add_line(i);
-			 // Then, we fill all desired non-zero entries, here we fill every entry even the entries that are zero
-			 // symmetric shear
-			  constraints.set_inhomogeneity(0,0);
-			  constraints.set_inhomogeneity(1,0);
-			  constraints.set_inhomogeneity(2,Delta_u2);
-			  constraints.set_inhomogeneity(3,0);
-			  constraints.set_inhomogeneity(4,Delta_u4);
-			  constraints.set_inhomogeneity(5,Delta_u5);
-			  constraints.set_inhomogeneity(6,Delta_u6);
-			  constraints.set_inhomogeneity(7,Delta_u7);
-
-//			 // simple shear
+//			 // symmetric shear [Heiduschke]
+//			 const double load = current_load_step*parameter.AL_initial_increment;
+//			 const double load_last = load - parameter.AL_initial_increment;
+//			 const double width = 1.;
+//			 const double height = 1.;
+//			 const double Delta_u2 = width * ( 1./std::sqrt(std::cos(load)) - 1./std::sqrt(std::cos(load_last)) );
+//			 const double Delta_u4 = width * ( std::sin(load)/std::sqrt(std::cos(load)) - std::sin(load_last)/std::sqrt(std::cos(load_last)) );
+//			 const double Delta_u5 = width * ( std::sqrt(std::cos(load)) - std::sqrt(std::cos(load_last)) );
+//			 const double Delta_u6 = Delta_u2 + Delta_u4;
+//			 const double Delta_u7 = Delta_u5;
+//
+//			 // First, add lines to the constraints matrix
+//			  for ( unsigned int i=0; i<8; i++)
+//				 constraints.add_line(i);
+//			 // Then, we fill all desired non-zero entries, here we fill every entry even the entries that are zero
+//			 // symmetric shear
 //			  constraints.set_inhomogeneity(0,0);
 //			  constraints.set_inhomogeneity(1,0);
-//			  constraints.set_inhomogeneity(2,0);
+//			  constraints.set_inhomogeneity(2,Delta_u2);
 //			  constraints.set_inhomogeneity(3,0);
 //			  constraints.set_inhomogeneity(4,Delta_u4);
-//			  constraints.set_inhomogeneity(5,0);
-//			  constraints.set_inhomogeneity(6,Delta_u4);
-//			  constraints.set_inhomogeneity(7,0);
+//			  constraints.set_inhomogeneity(5,Delta_u5);
+//			  constraints.set_inhomogeneity(6,Delta_u6);
+//			  constraints.set_inhomogeneity(7,Delta_u7);
+
+			 // simple shear
+			  for ( unsigned int i=0; i<8; i++)
+				 constraints.add_line(i);
+
+			  const double delta_u = apply_dirichlet_bc ? current_load_increment : 0;
+
+			  constraints.set_inhomogeneity(0,0);
+			  constraints.set_inhomogeneity(1,0);
+			  constraints.set_inhomogeneity(2,0);
+			  constraints.set_inhomogeneity(3,0);
+			  constraints.set_inhomogeneity(4,delta_u);
+			  constraints.set_inhomogeneity(5,0);
+			  constraints.set_inhomogeneity(6,delta_u);
+			  constraints.set_inhomogeneity(7,0);
 
 			 // Combined tension/compression - shear
 //			 if ( current_load_step<=parameter.nbr_loadsteps ) // tension
