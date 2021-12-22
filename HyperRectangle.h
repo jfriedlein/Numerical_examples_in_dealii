@@ -48,35 +48,51 @@ namespace HyperRectangle
 	 };
 
 	// All additional parameters
-	const bool trigger_localisation_by_notching = true;
+	const bool trigger_localisation_by_notching = false;
 	const enums::enum_coord notched_face = enums::x;
-	enums::enum_refine_special refine_special = enums::Mesh_refine_special_standard;
-	const bool refine_local_isotropic = true;
+	enums::enum_refine_special refine_special = enums::Mesh_HyperRectangle_coarse_and_fine_brick;
+	const bool refine_local_isotropic = false;
 	
 	// Boundary conditions
 	 const bool apply_sym_constraint_on_top_face = false; // to simulate plane strain for 3D, top face refers to zPlus
 	 
 	 // standard, tension:
-	  const enums::enum_BC BC_xMinus = enums::BC_sym;
-	  const enums::enum_BC BC_yPlus  = enums::BC_none;
-	  const bool constrain_sideways_sliding_of_loaded_face = false;
-	  const enums::enum_BC BC_yMinus = enums::BC_sym;
-	  const enums::enum_BC BC_zMinus = enums::BC_sym;
-	  const enums::enum_notch_type notch_type = enums::notch_linear;
-	  const bool notch_twice = false;
-	  const bool DENP_Laura = false;
+//	  const enums::enum_BC BC_xMinus = enums::BC_sym;
+//	  const enums::enum_BC BC_yPlus  = enums::BC_none;
+//	  const bool constrain_sideways_sliding_of_loaded_face = false;
+//	  const enums::enum_BC BC_yMinus = enums::BC_sym;
+//	  const enums::enum_BC BC_zMinus = enums::BC_sym;
+//	  const enums::enum_notch_type notch_type = enums::notch_linear;
+//	  const bool notch_twice = false;
+//	  const bool DENP_Laura = false;
+//	  const bool SheStrip = true;
 
-	  const bool Neto_planeStrain = true;
+	  const bool Neto_planeStrain = false;
+	  const bool refine_globally = false;
 
 	 // compression, Seupel et al:
 //	 const enums::enum_BC BC_xMinus = enums::BC_none;
 //	 const enums::enum_BC BC_yPlus  = enums::BC_none;//enums::BC_x0; //enums::BC_none; // guide top face
 //	 const bool constrain_sideways_sliding_of_loaded_face = false;
 //	 const enums::enum_BC BC_yMinus = enums::BC_fix;
-////	 const enums::enum_BC BC_zMinus = enums::BC_none; // 3D compression, Seupel et al
+//	 const enums::enum_BC BC_zMinus = enums::BC_none; // 3D compression, Seupel et al
 //	 const enums::enum_notch_type notch_type = enums::notch_round;
 //	 const bool notch_twice = true;
-//	 const bool DENP_Laura = true;
+//	 const bool DENP_Laura = false;
+//	 const bool DENP_Hagen = true;
+//	  const bool SheStrip = false;
+
+	 // 3D strip, left clamped, right pulled without contraction
+		const enums::enum_BC BC_yMinus = enums::BC_fix;
+		const enums::enum_BC BC_yPlus  = enums::BC_x0_z0;//enums::BC_x0; //enums::BC_none; // guide top face
+		const bool constrain_sideways_sliding_of_loaded_face = false;
+		const enums::enum_BC BC_xMinus = enums::BC_none;
+		const enums::enum_BC BC_zMinus = enums::BC_none;
+		const enums::enum_notch_type notch_type = enums::notch_round;
+		const bool notch_twice = false;
+		const bool DENP_Laura = false;
+		const bool DENP_Hagen = false;
+		const bool SheStrip = false;
 
 	// Notching
 	 const types::manifold_id manifold_id_notch_left = 10;
@@ -88,7 +104,7 @@ namespace HyperRectangle
 	// @note "tension" or "standard": \n
 	// We model 1/8 of the entire body and notch the body at y=0 (equals the middle of the entire body).
 	 //const enums::enum_loading_type loading_type = enums::Brick_Seupel_etal_a;
-	 const enums::enum_loading_type loading_type = enums::compression;
+	 //const enums::enum_loading_type loading_type = enums::compression;
 
 	// Evaluation points: \n
 	// We want points, one for the contraction of the center
@@ -112,6 +128,8 @@ namespace HyperRectangle
 		// BC on x0 plane
 		 if ( BC_xMinus==enums::BC_sym )	
 			numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		 else if ( BC_xMinus==enums::BC_fix )
+			numEx::BC_apply_fix( enums::id_boundary_xMinus, dof_handler_ref, fe, constraints );
 		 
 		// BC on y0 plane
 		 if ( BC_yMinus==enums::BC_fix )
@@ -122,6 +140,12 @@ namespace HyperRectangle
 		 else if ( BC_yMinus==enums::BC_sym)
 			numEx::BC_apply( enums::id_boundary_yMinus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 		 
+		 if ( BC_yPlus==enums::BC_x0_z0 )
+		 {
+			 numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+			 numEx::BC_apply( enums::id_boundary_yPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		 }
+
 		// BC on z0 plane ...
 		 if ( dim==3 ) // ... only for 3D
 		 {
@@ -155,9 +179,13 @@ namespace HyperRectangle
 		 const double edge_length_ratio = length / width;
 		 
 		// Using \a ceil(*), because elements are typically elongated in this direction (at least under tension)
-		 const unsigned int n_elements_in_y_for_homogeneous_mesh = n_elements_in_x_for_coarse_mesh * std::ceil( edge_length_ratio );
-		 const unsigned int n_elements_in_y_overhead = n_elements_in_x_for_coarse_mesh * std::ceil( std::ceil( edge_length_ratio ) - edge_length_ratio ) ;
+		 unsigned int n_elements_in_y_for_homogeneous_mesh = n_elements_in_x_for_coarse_mesh * std::ceil( edge_length_ratio );
 
+		 // hardcoded
+		 if ( refine_special == enums::Mesh_refine_none )
+			 n_elements_in_y_for_homogeneous_mesh = 15;
+
+		 const unsigned int n_elements_in_y_overhead = n_elements_in_x_for_coarse_mesh * std::ceil( std::ceil( edge_length_ratio ) - edge_length_ratio ) ;
 
 		// Refine at least a square part (widthxwidth) if desired. In case the plate is wider than long, we limit the length to the 0.9 *length,
 		// so we still leave a coarse part. If you want to limit the size of the refined fraction, just reduce the (1.*width).
@@ -203,6 +231,14 @@ namespace HyperRectangle
 				 repetitions_fine[enums::y] = 10;
 			 }
 
+			 if ( SheStrip )
+			 {
+				 repetitions_coarse[enums::x] = 5;
+				 repetitions_coarse[enums::y] = 14;
+				 repetitions_fine[enums::x] = 5;
+				 repetitions_fine[enums::y] = 6 * std::pow(2., n_refine_local-1);
+			 }
+
 			Triangulation<2> triangulation_fine, triangulation_coarse;
 			{
 				// The fine brick
@@ -233,6 +269,11 @@ namespace HyperRectangle
 			 {
 				 repetitions[enums::x] = 5;
 				 repetitions[enums::y] = 16;
+			 }
+			 else if ( notch_twice && DENP_Hagen )
+			 {
+				 repetitions[enums::x] = 3;
+				 repetitions[enums::y] = 18;
 			 }
 			 else
 			 {
@@ -281,9 +322,9 @@ namespace HyperRectangle
 				else
 				{
 					// There are only 6 faces for a cube in 3D, so if we missed one, something went terribly wrong
-					AssertThrow(false, ExcMessage( numEx_name+" - make_grid 2D<< Found an unidentified face at the boundary. "
-												   "Maybe it slipt through the assignment or that face is simply not needed. "
-												   "So either check the implementation or comment this line in the code") );
+//					AssertThrow(false, ExcMessage( numEx_name+" - make_grid 2D<< Found an unidentified face at the boundary. "
+//												   "Maybe it slipt through the assignment or that face is simply not needed. "
+//												   "So either check the implementation or comment this line in the code") );
 				}
 			  }
 			}
@@ -368,10 +409,17 @@ namespace HyperRectangle
 		 const double length = parameter.height;
 		 body_dimensions[enums::y] = length;
 
-		 const double notch_offset = DENP_Laura ? 10. : width;
+		 double notch_offset;
+		 if ( DENP_Laura )
+		 	 notch_offset = 10;
+		 else if ( DENP_Hagen )
+		  	  notch_offset = 20;
+		 else
+			 notch_offset = width;
+
 		 // double notch for compression or bottom notch for tension
 		  const double notch_y_right = notch_twice ? (length/2.+notch_offset/2.) : 0;
-		 const double notch_y_left = length/2.-notch_offset/2.;
+		 const double notch_y_left = length/2. - notch_offset/2.;
 
 		// notching
 		 // First notch on the right
@@ -412,6 +460,8 @@ namespace HyperRectangle
 						 if ( std::abs( cell->center()[enums::y] - ( notch_offset/width * cell->center()[enums::x] + notch_y_left ) )
 						 	  < 1.75*parameter.notchWidth/2. )
 							cell->set_refine_flag();
+						 if ( refine_globally )
+							 cell->set_refine_flag();
 				} // end for(cell)
 				triangulation.execute_coarsening_and_refinement();
 			 }
@@ -449,6 +499,8 @@ namespace HyperRectangle
 	{
 		parameterCollection parameters_internal;
 		const double search_tolerance = parameters_internal.search_tolerance;
+
+		 refine_special = enums::enum_refine_special(parameter.refine_special);
 
 		// Assign the dimensions of the hyper rectangle and store them as characteristic lengths
 		 const double width = parameter.width;
@@ -489,6 +541,7 @@ namespace HyperRectangle
 		 else
 			make_grid_flat( tria_flat, length, width, {notch1},
 							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements );
+
 
  		GridGenerator::extrude_triangulation( tria_flat, parameter.nbr_elementsInZ, thickness, triangulation, true );
 
@@ -535,16 +588,22 @@ namespace HyperRectangle
 			 if ( DENP_Laura )
 				 triangulation.refine_global(parameter.nbr_global_refinements);
 		 }
+		 else if ( refine_special == enums::Mesh_refine_none )
+		 {
+			 // no refinement
+		 }
 		 else
 		 {
-			 for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
+			 double length_refined = std::min( 1.*width, 0.9 * length );
+
+			 for ( unsigned int nbr_local_ref=0; nbr_local_ref < 1/*parameter.nbr_holeEdge_refinements*/; nbr_local_ref++ )
 			 {
 				for (typename Triangulation<dim>::active_cell_iterator
 							 cell = triangulation.begin_active();
 							 cell != triangulation.end(); ++cell)
 				{
 						// Find all cells that lay in an exemplary damage band with size 1/4 from the y=0 face
-						if ( cell->center()[enums::y] < width )
+						if ( cell->center()[enums::y] < length_refined )
 							cell->set_refine_flag();
 				} // end for(cell)
 				triangulation.execute_coarsening_and_refinement();
