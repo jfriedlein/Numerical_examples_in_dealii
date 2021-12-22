@@ -9,16 +9,6 @@
 
 namespace enums
 {
-	/**
-	 * For the driver: prescribed displacement or force (for AL and normal disp-, force-control)
-	 */
-	 enum enum_driver
-	 {
-		Neumann =   1,
-		Dirichlet = 2,
-		Contact = 3
-	 };
-
     enum enum_boundary_ids
 	{
     	// @note Don't use id 0 for anything (it's the standard value or the reset value)
@@ -70,21 +60,11 @@ namespace enums
 		Mesh_refine_none = 99,
 		Mesh_refine_beam_fineCoarseBrick = 1,
 		Mesh_refine_beam_nx1 = 2,
+		Mesh_refine_beam_nxm = 3,
 		Mesh_Rod_Upsetting_tapered = 10,
 		Mesh_Rod_ax_ratio_EL = 11,
 		Mesh_HyperRectangle_coarse_and_fine_brick = 12
 	};
-    
-    enum enum_coord
-	 {
-		x = 0,
-		y = 1,
-		z = 2
-		//r = 0,
-		//theta = 2,
-		//u = 0,
-		//w = 1
-	 };
 
    enum enum_special_QP
 	{
@@ -113,7 +93,8 @@ namespace enums
 	   BC_fix = 2, //!< BC_fix
 	   BC_x0 = 3,  //!< BC_x0
 	   BC_x0_z0 = 4,   //!< BC_x0_z0
-	   BC_y0 = 5   //!< BC_y0
+	   BC_y0 = 5,   //!< BC_y0
+	   BC_y0_z0 = 6
    };
 }
 
