@@ -176,7 +176,9 @@ namespace Unconstrained_elastoplastic_test
 
 		 // rotation by 45° = pi/4 in counter-clockwise direction
 		  const double rotation_angle_in_radian = (std::atan(1)*4.) / 4.;
-		  GridTools::rotate(rotation_angle_in_radian,enums::z,triangulation);
+		  //GridTools::rotate( rotation_angle_in_radian, (unsigned int) enums::z, triangulation );
+//		  GridTools::rotate( rotation_angle_in_radian, triangulation );
+		  AssertThrow(false, ExcMessage("Unconstrained_elastoplastic_test - make_grid<< Only implemented for 2D. use the correct rotation option for 2D."))
 
 		// Refinement
 		 triangulation.refine_global( parameter.nbr_global_refinements );
