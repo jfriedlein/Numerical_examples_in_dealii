@@ -22,14 +22,19 @@ namespace Rod
  * CERTIFIED TO STANDARD numExS07 (200724)
  */
 {
+	// Name of the numerical example
+	 std::string numEx_name = "Rod";
+//	 std::string numEx_name = "Disk_upsetting";
+//	 std::string numEx_name = "hole_bulging";
+
 	// The loading direction: \n
 	// In which coordinate direction the load shall be applied, so x/y/z.
-//	 const unsigned int loading_direction = enums::y; // NoaR and Disk upsetting
-	 const unsigned int loading_direction = enums::x; // hole bulging
+	 const unsigned int loading_direction = enums::y; // NoaR and Disk upsetting
+//	 const unsigned int loading_direction = enums::x; // hole bulging
 
 	// The loaded faces:
-//	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus; // NoaR and Disk upsetting
-	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_xMinus; // hole bulging
+	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus; // NoaR and Disk upsetting
+//	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_xMinus; // hole bulging
 
 	// Here you can choose between a radial notch (smooth dent) and a sharp triangular notch (viewed in the cross section)
 	// USER parameter
@@ -41,23 +46,24 @@ namespace Rod
 	  const enums::enum_BC BC_xPlus  = enums::BC_none; // free
 
 	 // NoaR and Disk upsetting
-//	  const enums::enum_BC BC_xMinus  = enums::BC_x0; // symmetry
+	  const enums::enum_BC BC_xMinus  = enums::BC_x0; // symmetry
 
 	 // NoaR
 //	  const enums::enum_BC BC_yPlus  = enums::BC_none;  // standard: free
+	  const enums::enum_BC BC_yPlus  = enums::BC_x0;  // Geers, no contraction
 
 	 // Disk upsetting (sticking)
 //	  const enums::enum_BC BC_yPlus  = enums::BC_x0_z0; // special: no contraction of loaded face, sticking contact
 
 	 // hole bulging
-	  const enums::enum_BC BC_xMinus = enums::BC_y0;
-	  const enums::enum_BC BC_yPlus = enums::BC_none;
+//	  const enums::enum_BC BC_xMinus = enums::BC_y0;
+//	  const enums::enum_BC BC_yPlus = enums::BC_none;
 
 	 // special
 //	  const enums::enum_BC BC_yPlus  = enums::BC_y0; // special: symmetry condition
 //	  const enums::enum_BC BC_xMinus  = enums::BC_none; // free
 
-	 const bool shift_mesh = true;  // hole bulging
+	 const bool shift_mesh = false;  // hole bulging
 
 	// Some internal parameters
 	 struct parameterCollection
@@ -223,7 +229,7 @@ namespace Rod
 		 CylindricalManifold<dim> cylindrical_manifold_3d (y); // y-axis
 		 triangulation.set_manifold( parameters_internal.manifold_id_surf, cylindrical_manifold_3d );
 
-		double cell_size_innermost = 9e9;
+		//double cell_size_innermost = 9e9;
 		if ( parameter.refine_special == enums::Mesh_refine_special_standard || parameter.refine_special == enums::Mesh_refine_special_innermost )
 		{
 			// Global refinement of the mesh to get a better approximation of the contour:\n
@@ -288,7 +294,7 @@ namespace Rod
 			 }
 
 			// We store the size of the innermost cell from the last new_pos
-			 cell_size_innermost = new_pos;
+			 //cell_size_innermost = new_pos;
 		}
 		else if ( parameter.refine_special == enums::Rod_refine_special_uniform )
 		{
@@ -703,8 +709,8 @@ namespace Rod
 
 			// Evaluation points and the related list of them
 			 numEx::EvalPointClass<3> eval_center ( Point<3>(notch_radius,0,0), enums::x );
-			 numEx::EvalPointClass<3> eval_top ( Point<3>(2,0,0), enums::x );
-//			 numEx::EvalPointClass<3> eval_top ( Point<3>(radius,half_length,0), enums::x ); // NoaR, Disk upsetting
+			 numEx::EvalPointClass<3> eval_top ( Point<3>(radius,half_length,0), enums::x ); // NoaR, Disk upsetting
+//			 numEx::EvalPointClass<3> eval_top ( Point<3>(2,0,0), enums::x ); // hole bulging
 			 eval_points_list = {eval_center,eval_top};
 		}
 		else // @todo What is this?
@@ -732,12 +738,12 @@ namespace Rod
 		 triangulation.refine_global(parameter.nbr_global_refinements);	// ... Parameter.prm file
 
 		// Output the triangulation as eps or inp
-		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
+//		 numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
 	}
 
 
 	template<int dim>
-	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
+	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
 							const bool &apply_dirichlet_bc, double &current_load_increment,
 							const Parameter::GeneralParameters &parameter)
 	{
@@ -767,6 +773,8 @@ namespace Rod
 		 }
 		 else if ( BC_yPlus==enums::BC_y0 )
 			numEx::BC_apply( enums::id_boundary_yPlus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		 else if ( BC_yPlus==enums::BC_x0 )
+			numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 		// BC for the load ...
 		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver
