@@ -77,9 +77,9 @@ namespace Unconstrained_elastoplastic_test
 	 * @todo Change setup (see HyperR) where we define boundary for BC_xMinus and then use if ( BC_xMinus==... ), use the value of BC_xMinus directly
 	 */
 	template<int dim>
-	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
-							const bool &apply_dirichlet_bc, double &current_load_increment, const Parameter::GeneralParameters &parameter,
-							const unsigned int current_load_step )
+	void make_constraints ( AffineConstraints<double> &constraints, /*const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,*/
+							const bool &apply_dirichlet_bc, double &current_load_increment, const Parameter::GeneralParameters &parameter /*,
+							const unsigned int current_load_step*/ )
 	{
 		// BC for the load ...
 		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver, alternatively  ...
@@ -175,10 +175,12 @@ namespace Unconstrained_elastoplastic_test
 		 }
 
 		 // rotation by 45° = pi/4 in counter-clockwise direction
-		  const double rotation_angle_in_radian = (std::atan(1)*4.) / 4.;
+		 {
+//		  const double rotation_angle_in_radian = (std::atan(1)*4.) / 4.;
 		  //GridTools::rotate( rotation_angle_in_radian, (unsigned int) enums::z, triangulation );
 //		  GridTools::rotate( rotation_angle_in_radian, triangulation );
 		  AssertThrow(false, ExcMessage("Unconstrained_elastoplastic_test - make_grid<< Only implemented for 2D. use the correct rotation option for 2D."))
+		 }
 
 		// Refinement
 		 triangulation.refine_global( parameter.nbr_global_refinements );
