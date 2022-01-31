@@ -104,9 +104,9 @@ namespace HyperCube_shear
 	 * @todo Change setup (see HyperR) where we define boundary for BC_xMinus and then use if ( BC_xMinus==... ), use the value of BC_xMinus directly
 	 */
 	template<int dim>
-	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
-							const bool &apply_dirichlet_bc, double &current_load_increment, const Parameter::GeneralParameters &parameter,
-							const unsigned int current_load_step )
+	void make_constraints ( AffineConstraints<double> &constraints, /*const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,*/
+							const bool &apply_dirichlet_bc, double &current_load_increment, const Parameter::GeneralParameters &parameter /*,
+							const unsigned int current_load_step*/ )
 	{
 		// Fix the bottom face
 		 //numEx::BC_apply_fix( enums::id_boundary_yMinus, dof_handler_ref, fe, constraints );
@@ -448,8 +448,6 @@ namespace HyperCube_shear
 		}
 
 		// Notch
-		 const types::manifold_id manifold_id_notch_left = 10;
-
 		 numEx::NotchClass<dim> notch ( enums::notch_linear, width, width*(1.-parameter.ratio_x), Point<3>(0,width/2.,0), enums::id_boundary_xMinus,
 										Point<3>(-1,0,0), enums::y);
 		 numEx::notch_body( triangulation, notch );
