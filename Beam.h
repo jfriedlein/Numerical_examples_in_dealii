@@ -41,7 +41,7 @@ namespace Beam
 {
 	// The loading direction: \n
 	// In which coordinate direction the load shall be applied, so x/y/z.
-	 const unsigned int loading_direction = enums::y; // TEST: before y
+	 const unsigned int loading_direction = enums::y;
 
 	// The loaded faces:
 	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_xPlus; // load applied on the right face
@@ -61,8 +61,8 @@ namespace Beam
 	 const unsigned int beam_type = enums::beam_clamped_free;
 
 	template<int dim>
-	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
-							const bool &apply_dirichlet_bc, double &current_load_increment, const double &lambda_n,
+	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
+							const bool &apply_dirichlet_bc, double &current_load_increment,
 							const Parameter::GeneralParameters &parameter )
 	{
 		// clamping on X0 plane: set x, y and z displacements on x0 plane to zero
@@ -84,12 +84,15 @@ namespace Beam
 		// BC for the load ...
 		 if ( parameter.driver == enums::Neumann )
 		 {
-			numEx::BC_apply_fix( enums::id_boundary_xMinus2, dof_handler_ref, fe, constraints );
+			numEx::BC_apply_fix( enums::id_boundary_xMinus, dof_handler_ref, fe, constraints );
 		 }
 		 else if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver, alternatively  ...
 		 {
+			numEx::BC_apply_fix( enums::id_boundary_xMinus, dof_handler_ref, fe, constraints );
+			numEx::BC_apply( id_boundary_load, enums::y, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+
 			if ( beam_type==enums::beam_clamped_sliding )
-				numEx::BC_apply( id_boundary_load, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+				numEx::BC_apply( id_boundary_load, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 			// classical
 //			 numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
@@ -107,28 +110,28 @@ namespace Beam
 //				numEx::BC_apply( id_boundary_load, enums::y, current_load_increment_y, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 //			}
 
-			// prescribed pseudo pure bending load
-			numEx::BeamEnd<dim> beamEnd (body_dimensions[enums::x], body_dimensions[enums::y], lambda_n, current_load_increment, n_components);
-
-			if (apply_dirichlet_bc == true )
-			{
-				// Apply the given load
-				 VectorTools::interpolate_boundary_values(
-						 dof_handler_ref,
-															id_boundary_load,
-															beamEnd,
-															constraints
-														 );
-			}
-			else
-			{
-				VectorTools::interpolate_boundary_values(
-						dof_handler_ref,
-															id_boundary_load,
-															ZeroFunction<dim> ( n_components ),
-															constraints
-														);
-			}
+//			// prescribed pseudo pure bending load
+//			numEx::BeamEnd<dim> beamEnd (body_dimensions[enums::x], body_dimensions[enums::y], lambda_n, current_load_increment, n_components);
+//
+//			if (apply_dirichlet_bc == true )
+//			{
+//				// Apply the given load
+//				 VectorTools::interpolate_boundary_values(
+//						 dof_handler_ref,
+//															id_boundary_load,
+//															beamEnd,
+//															constraints
+//														 );
+//			}
+//			else
+//			{
+//				VectorTools::interpolate_boundary_values(
+//						dof_handler_ref,
+//															id_boundary_load,
+//															ZeroFunction<dim> ( n_components ),
+//															constraints
+//														);
+//			}
 		 }
 		 else if ( parameter.driver == enums::Contact ) // ... as contact
 		 {
@@ -165,7 +168,7 @@ namespace Beam
 
 
 		 if ( parameter.refine_special == enums::Mesh_refine_beam_fineCoarseBrick )
-		{
+		 {
 			// Vector containing the number of elements in each dimension
 			// The coarse segment consists of the set number of elements in the y-direction
 			 std::vector<unsigned int> repetitions (dim);
@@ -214,7 +217,7 @@ namespace Beam
 				}
 				triangulation.execute_coarsening_and_refinement();
 			}
-		}
+		 }
 		else if ( parameter.refine_special == enums::Mesh_refine_uniform ) // use uniform brick with xy refinements
 		{
 			 std::vector<unsigned int> repetitions (dim);
@@ -237,6 +240,19 @@ namespace Beam
 														 p1,
 														 p4 );
 		 }
+		 else if ( parameter.refine_special == enums::Mesh_refine_beam_nxm )
+		 {
+			 std::vector<unsigned int> repetitions (dim);
+			 repetitions[enums::x] = parameter.grid_y_repetitions;
+			 repetitions[enums::y] = parameter.nbr_elementsInZ;
+
+			 GridGenerator::subdivided_hyper_rectangle ( triangulation,
+														 repetitions,
+														 p1,
+														 p4 );
+		 }
+		 else
+			 AssertThrow(false,ExcMessage("Beam - make_grid<< Undefined refine_special case."))
 
 		// Clear all existing boundary ID's
 		 numEx::clear_boundary_IDs( triangulation );
@@ -390,29 +406,8 @@ namespace Beam
 //				AssertThrow(found_vertex, ExcMessage("Beam<< We weren't able to find at least a single vertex to be notched."));
 //			}
 //
-//			// include the following two scopes to see directly how the variation of the input parameters changes the geometry of the grid
-//			/*
-//			{
-//				std::ofstream out ("grid-2d_quarter_plate_merged.eps");
-//				GridOut grid_out;
-//				GridOutFlags::Eps<2> eps_flags;
-//				eps_flags.line_width = 0.1;
-//				grid_out.set_flags (eps_flags);
-//				grid_out.write_eps (triangulation, out);
-//				std::cout << "Grid written to grid-2d_quarter_plate_merged.eps" << std::endl;
-//				std::cout << "nElem: " << triangulation.n_active_cells() << std::endl;
-//				AssertThrow(false,ExcMessage("ddd"));
-//			}
-//
-//			{
-//				std::ofstream out_ucd("Grid-2d_quarter_plate_merged.inp");
-//				GridOut grid_out;
-//				GridOutFlags::Ucd ucd_flags(true,true,true);
-//				grid_out.set_flags(ucd_flags);
-//				grid_out.write_ucd(triangulation, out_ucd);
-//				std::cout<<"Mesh written to Grid-2d_quarter_plate_merged.inp "<<std::endl;
-//			}
-//			*/
+		// Output the triangulation as eps or inp
+		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
 		}
 
 
