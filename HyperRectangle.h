@@ -48,7 +48,7 @@ namespace HyperRectangle
 	 };
 
 	// All additional parameters
-	const bool trigger_localisation_by_notching = false;
+	const bool trigger_localisation_by_notching = true;
 	const enums::enum_coord notched_face = enums::x;
 	enums::enum_refine_special refine_special = enums::Mesh_HyperRectangle_coarse_and_fine_brick;
 	const bool refine_local_isotropic = false;
@@ -57,15 +57,16 @@ namespace HyperRectangle
 	 const bool apply_sym_constraint_on_top_face = false; // to simulate plane strain for 3D, top face refers to zPlus
 	 
 	 // standard, tension:
-//	  const enums::enum_BC BC_xMinus = enums::BC_sym;
-//	  const enums::enum_BC BC_yPlus  = enums::BC_none;
-//	  const bool constrain_sideways_sliding_of_loaded_face = false;
-//	  const enums::enum_BC BC_yMinus = enums::BC_sym;
-//	  const enums::enum_BC BC_zMinus = enums::BC_sym;
-//	  const enums::enum_notch_type notch_type = enums::notch_linear;
-//	  const bool notch_twice = false;
-//	  const bool DENP_Laura = false;
-//	  const bool SheStrip = true;
+	  const enums::enum_BC BC_xMinus = enums::BC_sym;
+	  const enums::enum_BC BC_yPlus  = enums::BC_none;
+	  const bool constrain_sideways_sliding_of_loaded_face = false;
+	  const enums::enum_BC BC_yMinus = enums::BC_sym;
+	  const enums::enum_BC BC_zMinus = enums::BC_sym;
+	  const enums::enum_notch_type notch_type = enums::notch_linear;
+	  const bool notch_twice = false;
+	  const bool DENP_Laura = false;
+	  const bool DENP_Hagen = false;
+	  const bool SheStrip = true;
 
 	  const bool Neto_planeStrain = false;
 	  const bool refine_globally = false;
@@ -83,16 +84,16 @@ namespace HyperRectangle
 //	  const bool SheStrip = false;
 
 	 // 3D strip, left clamped, right pulled without contraction
-		const enums::enum_BC BC_yMinus = enums::BC_fix;
-		const enums::enum_BC BC_yPlus  = enums::BC_x0_z0;//enums::BC_x0; //enums::BC_none; // guide top face
-		const bool constrain_sideways_sliding_of_loaded_face = false;
-		const enums::enum_BC BC_xMinus = enums::BC_none;
-		const enums::enum_BC BC_zMinus = enums::BC_none;
-		const enums::enum_notch_type notch_type = enums::notch_round;
-		const bool notch_twice = false;
-		const bool DENP_Laura = false;
-		const bool DENP_Hagen = false;
-		const bool SheStrip = false;
+//		const enums::enum_BC BC_yMinus = enums::BC_fix;
+//		const enums::enum_BC BC_yPlus  = enums::BC_x0_z0;//enums::BC_x0; //enums::BC_none; // guide top face
+//		const bool constrain_sideways_sliding_of_loaded_face = false;
+//		const enums::enum_BC BC_xMinus = enums::BC_none;
+//		const enums::enum_BC BC_zMinus = enums::BC_none;
+//		const enums::enum_notch_type notch_type = enums::notch_round;
+//		const bool notch_twice = false;
+//		const bool DENP_Laura = false;
+//		const bool DENP_Hagen = false;
+//		const bool SheStrip = false;
 
 	// Notching
 	 const types::manifold_id manifold_id_notch_left = 10;
@@ -170,7 +171,7 @@ namespace HyperRectangle
 
 	void make_grid_flat( Triangulation<2> &tria_flat,
 						 const double &length, const double &width, const std::vector< numEx::NotchClass<2> > &notch_list,
-						 const unsigned int n_elements_in_x_for_coarse_mesh, const unsigned int n_refine_global, const unsigned int n_refine_local )
+						 const unsigned int n_elements_in_x_for_coarse_mesh, const unsigned int n_refine_global, const unsigned int n_refine_local, const unsigned int aux_var )
 	{
 		parameterCollection parameters_internal;
 		const double search_tolerance = parameters_internal.search_tolerance;
@@ -183,7 +184,7 @@ namespace HyperRectangle
 
 		 // hardcoded
 		 if ( refine_special == enums::Mesh_refine_none )
-			 n_elements_in_y_for_homogeneous_mesh = 15;
+			 n_elements_in_y_for_homogeneous_mesh = aux_var; //15;
 
 		 const unsigned int n_elements_in_y_overhead = n_elements_in_x_for_coarse_mesh * std::ceil( std::ceil( edge_length_ratio ) - edge_length_ratio ) ;
 
@@ -399,7 +400,7 @@ namespace HyperRectangle
 	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
 		parameterCollection parameters_internal;
-		const double search_tolerance = parameters_internal.search_tolerance;
+		//const double search_tolerance = parameters_internal.search_tolerance;
 
 		 refine_special = enums::enum_refine_special(parameter.refine_special);
 
@@ -408,6 +409,7 @@ namespace HyperRectangle
 		 body_dimensions[enums::x] = width;
 		 const double length = parameter.height;
 		 body_dimensions[enums::y] = length;
+		 const unsigned int aux_var = int(parameter.holeRadius);
 
 		 double notch_offset;
 		 if ( DENP_Laura )
@@ -442,10 +444,10 @@ namespace HyperRectangle
 		// Create the 2D base mesh
 		 if ( notch_twice )
 			make_grid_flat( triangulation, length, width, {notch1,notch2},
-							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements );
+							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements, aux_var );
 		 else
 			make_grid_flat( triangulation, length, width, {notch1},
-							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements );
+							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements, aux_var );
 
 		// Local refinements
 		 if ( notch_twice )
@@ -509,6 +511,8 @@ namespace HyperRectangle
 		 body_dimensions[enums::y] = length;
 		 const double thickness = parameter.thickness;
 		 body_dimensions[enums::z] = thickness;
+		 const unsigned int aux_var = int(parameter.holeRadius);
+
 
 		 const double notch_offset = DENP_Laura ? 10. : width;
 		 // double notch for compression or bottom notch for tension
@@ -537,10 +541,10 @@ namespace HyperRectangle
 		// Create the 2D base mesh
 		 if ( notch_twice )
 			make_grid_flat( tria_flat, length, width, {notch1,notch2},
-							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements );
+							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements, aux_var );
 		 else
 			make_grid_flat( tria_flat, length, width, {notch1},
-							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements );
+							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements, aux_var );
 
 
  		GridGenerator::extrude_triangulation( tria_flat, parameter.nbr_elementsInZ, thickness, triangulation, true );
