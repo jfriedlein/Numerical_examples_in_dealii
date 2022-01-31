@@ -47,7 +47,7 @@ namespace Miyauchi_shear
 	 };
 
 	template<int dim>
-	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
+	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
 							const bool &apply_dirichlet_bc, double &current_load_increment,
 							const Parameter::GeneralParameters &parameter )
 	{
@@ -68,7 +68,7 @@ namespace Miyauchi_shear
 
 
 	template <int dim>
-	void make_half_grid( Triangulation<dim> &triangulation, const Parameter::GeneralParameters &parameter)
+	void make_half_grid( Triangulation<dim> &triangulation )
 	{
 		const double widthX = 81.25;
 		const double heightY_half = 65./2.;
@@ -190,8 +190,8 @@ namespace Miyauchi_shear
 		const double search_tolerance = parameters_internal.search_tolerance;
 
 		Triangulation<dim> tria_left, tria_right;
-		make_half_grid( tria_left, parameter);
-		make_half_grid( tria_right, parameter);
+		make_half_grid( tria_left );
+		make_half_grid( tria_right );
 
 		// @todo-optimize Better use function transform instead of rotate
 		GridTools::rotate(std::atan(1) * 4./*180 degrees*/, tria_right);
@@ -320,6 +320,9 @@ namespace Miyauchi_shear
 	template <int dim>
 	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
+		std::cout << "number of active cells: " << triangulation.n_active_cells() << std::endl;
+		std::cout << "Chosen numerical example: " << parameter.numExample << std::endl;
+
 		AssertThrow(false, ExcMessage("Miyauchi_shear<< not yet implemented for 3D."));
 	}
 }
