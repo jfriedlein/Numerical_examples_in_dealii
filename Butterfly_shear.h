@@ -25,6 +25,8 @@ namespace Butterfly_shear
 	 const unsigned int loading_direction = enums::y;
 //	 const unsigned int loading_direction = enums::x;
 
+	 const bool debugging_output = false;
+
 	// Evaluation point
 	 Point<3> eval_point;
 
@@ -45,7 +47,7 @@ namespace Butterfly_shear
 	 };
 
 	template<int dim>
-	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
+	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
 							const bool &apply_dirichlet_bc, double &current_load_increment,
 							const Parameter::GeneralParameters &parameter )
 	{
@@ -75,7 +77,12 @@ namespace Butterfly_shear
 		const double height_w = parameter.height; // 15 // wing height
 
 		const double aux_ratio = (height_w-height_b)/(2.*width_w);
-		const double notch_radius = width_b/2. / (aux_ratio/std::sqrt(1+aux_ratio*aux_ratio));
+
+		if ( debugging_output )
+		{
+			const double notch_radius = width_b/2. / (aux_ratio/std::sqrt(1+aux_ratio*aux_ratio));
+			std::cout << "Resulting notch radius: notch_radius=" << notch_radius << std::endl;
+		}
 
 		body_dimensions[enums::x] = 2.*width_w+width_b;
 		body_dimensions[enums::y] = height_w;
