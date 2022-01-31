@@ -614,7 +614,8 @@ namespace numEx
 					   if ( y_coord < half_notch_length && (std::find(index_list.begin(), index_list.end(), index_vertex) == index_list.end()) )
 					   {
 						  double x_coord = cell->vertex(vertex)[x];
-						  double vertex_radius, z_coord;
+						  double vertex_radius=0.;
+						  double z_coord=0.;
 						  if ( dim==2 || ( dim==3 && geom_cylindrical==false ) )
 							  vertex_radius=x_coord;
 						  else if ( dim==3 && geom_cylindrical )
