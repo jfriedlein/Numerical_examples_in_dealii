@@ -47,7 +47,7 @@ namespace tensileSpecimen
 
 
 	template<int dim>
-	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
+	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
 							const bool &apply_dirichlet_bc, double &current_load_increment,
 							const Parameter::GeneralParameters &parameter )
 	{
@@ -407,8 +407,8 @@ namespace tensileSpecimen
 		 const double length_parallel = parameter.height;
 
 		// possiblity to extend the model to the left and right by these additional lengths
-		 const double extension_lower = 0.;
-		 const double extension_upper = 0.;
+		 //const double extension_lower = 0.;
+		 //const double extension_upper = 0.;
 
 		// Set the lower center point
 		 Point<2> lower_radius_center;
@@ -591,8 +591,8 @@ namespace tensileSpecimen
 		 const double length_parallel = parameter.height;
 		 
 		// possiblity to extend the model to the left and right by these additional lengths
-		 const double extension_lower = 0.;
-		 const double extension_upper = 0.;
+		 //const double extension_lower = 0.;
+		 //const double extension_upper = 0.;
 		
 		AssertThrow( hwidth_B > hwidth_b + ( 1 - std::sin(22.5 * std::atan(1)*4/180)) * transition_radius,
 					 ExcMessage("tensileSpecimen<< We cannot yet model meshes with a very soft radius. "
