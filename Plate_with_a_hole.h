@@ -41,7 +41,7 @@ namespace PlateWithAHole
 	 };
 
 	template<int dim>
-	void make_constraints ( AffineConstraints<double>  &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
+	void make_constraints ( AffineConstraints<double>  &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
 							const bool &apply_dirichlet_bc, const double &current_load_increment,
 							const Parameter::GeneralParameters &parameter )
 	{
