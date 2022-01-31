@@ -54,7 +54,7 @@ namespace QuarterHyperCube_Merged
 	 };
 
 	template<int dim>
-	void make_constraints ( AffineConstraints<double>  &constraints, const FESystem<dim> &fe, unsigned int &n_components, DoFHandler<dim> &dof_handler_ref,
+	void make_constraints ( AffineConstraints<double>  &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
 							const bool &apply_dirichlet_bc, const double &current_load_increment,
 							const Parameter::GeneralParameters &parameter )
 	{
@@ -361,14 +361,14 @@ namespace QuarterHyperCube_Merged
 
 		// size of the plate divided by the size of the hole
 		  double ratio_width_To_holeRadius = parameter.width;
-		  double width = parameter.width/2.;
+		  //double width = parameter.width/2.;
 		  double holeRadius = parameter.holeRadius;
 
 		  // size of the inner mesh (hypercube with hole) relative to size of the whole plate
 		  double ratio_x = parameter.ratio_x;
 
 		  // USER parameter
-		  const double refine_local_gradation = 0.75;
+		  //const double refine_local_gradation = 0.75;
 
 		const double search_tolerance = parameters_internal.search_tolerance;
 
