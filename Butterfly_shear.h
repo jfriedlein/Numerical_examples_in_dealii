@@ -20,6 +20,9 @@ namespace Butterfly_shear
  * CERTIFIED TO STANDARD numExS07 (200724)
  */
 {
+	// Name of the numerical example
+	 std::string numEx_name = "Butterfly-like shear specimen";
+
 	// The loading direction: \n
 	// In which coordinate direction the load shall be applied, so x/y/z.
 	 const unsigned int loading_direction = enums::y;
@@ -67,6 +70,9 @@ namespace Butterfly_shear
 	template <int dim>
 	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
+		parameterCollection parameters_internal;
+		const double search_tolerance = parameters_internal.search_tolerance;
+
 		// ToDo-assure: the use the values from the parameter file
 		// _b: body of butterfly
 		// _w: wing of butterfly
@@ -98,10 +104,6 @@ namespace Butterfly_shear
 			 eval_point[enums::x] = body_dimensions[enums::x];
 			 eval_point[enums::y] = body_dimensions[enums::y]/2.;
 		}
-
-		parameterCollection parameters_internal;
-
-		const double search_tolerance = parameters_internal.search_tolerance;
 
 		// Create the left wing
 		 Point<dim> p1 (0,0);
@@ -229,8 +231,8 @@ namespace Butterfly_shear
 			}
 		 }
 
-		// Output the triangulation as eps or inp
-		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
+		 // Output the triangulation as eps or inp
+//		 numEx::output_triangulation( triangulation, enums::output_eps, numEx_name, true );
 	}
 
 
@@ -238,6 +240,8 @@ namespace Butterfly_shear
 	template <int dim>
 	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
 	{
+		AssertThrow(false, ExcMessage("Butterfly_sehar-make_grid<< The 3D variant is a bit goofy. First debug it."));
+
 		parameterCollection parameters_internal;
 
 		const double search_tolerance = parameters_internal.search_tolerance;
