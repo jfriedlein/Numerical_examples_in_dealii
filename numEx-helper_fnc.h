@@ -222,7 +222,7 @@ namespace numEx
 	}
 	
 	template<int dim>
-	void output_triangulation ( const Triangulation<dim> &triangulation, const unsigned int output_type=enums::output_eps, const std::string numEx_name="numEx" )
+	void output_triangulation ( const Triangulation<dim> &triangulation, const unsigned int output_type=enums::output_eps, const std::string numEx_name="numEx", const bool terminate_after_output=false )
 	{
 		std::cout << "numEx<< Writting triangulation to output ..." << std::endl;
 		std::ostringstream filename;
@@ -250,6 +250,8 @@ namespace numEx
 				AssertThrow(false, ExcMessage(numEx_name+" - output_triangulation<< You choose a not implemented output type, try eps or inp instead."));
 		}
 		std::cout << "numEx<< ... grid written to " << filename.str().c_str() << std::endl;
+		if ( terminate_after_output )
+			 AssertThrow(false,ExcMessage("output_triangulation<< Done"));
 	}
 
 	
