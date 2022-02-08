@@ -74,7 +74,8 @@ namespace enums
    enum enum_output_type
    {
 	   output_eps = 0,
-	   output_inp = 1
+	   output_inp = 1,
+	   output_eps_as_2D = 2
    };
    
    enum enum_notch_type
@@ -222,7 +223,8 @@ namespace numEx
 	}
 	
 	template<int dim>
-	void output_triangulation ( const Triangulation<dim> &triangulation, const unsigned int output_type=enums::output_eps, const std::string numEx_name="numEx", const bool terminate_after_output=false )
+	void output_triangulation ( const Triangulation<dim> &triangulation, const unsigned int output_type=enums::output_eps,
+								const std::string numEx_name="numEx", const bool terminate_after_output=false )
 	{
 		std::cout << "numEx<< Writting triangulation to output ..." << std::endl;
 		std::ostringstream filename;
@@ -244,6 +246,17 @@ namespace numEx
 				GridOutFlags::Ucd ucd_flags(true,true,true);
 				grid_out.set_flags(ucd_flags);
 				grid_out.write_ucd(triangulation, out_ucd);
+				break;
+			}
+			case enums::output_eps_as_2D:
+			{
+			   // Output top view (xy-plane) of 3D mesh
+				filename << "grid-" << numEx_name << ".eps";
+				std::ofstream out (filename.str().c_str()); // @todo-optimize That should be simpler?!
+				GridOut grid_out;
+				GridOutFlags::Eps<dim> eps_flags(GridOutFlags::EpsFlagsBase::SizeType::width,300,0.5,false,2,1e-6/*0 fails*/,0);
+				grid_out.set_flags(eps_flags);
+				grid_out.write_eps (triangulation, out);
 				break;
 			}
 			default:
