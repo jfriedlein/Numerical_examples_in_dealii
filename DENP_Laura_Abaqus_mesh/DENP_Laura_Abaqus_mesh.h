@@ -160,8 +160,11 @@ namespace DENP_Laura_Abaqus_mesh
 		  	  case 5:
 				  path_to_inp = "../Numerical_examples_in_dealii/DENP_Laura_Abaqus_mesh/DENP_Laura_Abaqus_mesh_m5_6040el.inp";
 				  break;
+		  	  case 6:
+				  path_to_inp = "../Numerical_examples_in_dealii/DENP_Laura_Abaqus_mesh/DENP_Laura_Abaqus_mesh_m6_10972el.inp";
+				  break;
 		  	  default:
-		  		  AssertThrow(false,ExcMessage("DENP_Laura_Abaqus_mesh::make_grid<< Not available mesh chosen via refine_special."));
+		  		  AssertThrow(false,ExcMessage("DENP_Laura_Abaqus_mesh::make_grid<< Not available mesh chosen via refine_special or default value used."));
 		  		  break;
 		  }
 		  std::ifstream input_file(path_to_inp);
