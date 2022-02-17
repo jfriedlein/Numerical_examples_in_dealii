@@ -317,6 +317,11 @@ void numEx_HyperRectangle<dim>::make_grid_flat
 				 repetitions[enums::x] = 3;
 				 repetitions[enums::y] = 18;
 			 }
+			 else if ( notch_twice && DENP_planeStrain )
+			 {
+				 repetitions[enums::x] = 6;
+				 repetitions[enums::y] = 24;
+			 }
 			 else
 			 {
 				 repetitions[enums::x] = n_elements_in_x_for_coarse_mesh * (n_refine_global+1);
@@ -500,10 +505,12 @@ void numEx_HyperRectangle<dim>::make_grid
 		 if ( notch_twice )
 			make_grid_flat( triangulation, length, width, {notch1,notch2},
 							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements, body_dimensions, aux_var );
-		 else
+		 else if (notch_twice==false)
 			make_grid_flat( triangulation, length, width, {notch1},
 							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements, body_dimensions,  aux_var );
-
+		 else // just to get rid of the unused variable warning
+		 	std::cout << "relativePath " << relativePath << std::endl;
+			 
 		// Local refinements
 		 if ( notch_twice )
 		 {
