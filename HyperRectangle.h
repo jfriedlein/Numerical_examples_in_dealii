@@ -15,37 +15,65 @@
 // also contains enumerators as part of "enums::"
 #include "./numEx-helper_fnc.h"
 
-using namespace dealii;
+#include "numEx-baseClass.h"
 
-namespace HyperRectangle
-/*
- * A hyper rectangle with three symmetry constraints, loaded in y-direction
- *
- * CERTIFIED TO STANDARD xxx
+/**
+ * @brief 
+ * CERTIFIED TO STANDARD S22
+ * 
+ * @tparam dim 
  */
+template<int dim>
+class numEx_HyperRectangle : public numEx_class<dim>
 {
-	// Name of the numerical example
-	 std::string numEx_name = "HyperRectangle";
- 
-	// The loading direction: \n
-	// In which coordinate direction the load shall be applied, so x/y/z.
-	 const unsigned int loading_direction = enums::y;
+  public:
+    std::string numEx_name() {
+    	return "HyperRectangle";
+    };
+	
+    unsigned int loading_direction() {
+		return enums::y;
+	};	
+    
+    std::vector< enums::enum_boundary_ids > id_boundary_loads()
+	{
+		std::vector< enums::enum_boundary_ids > id_boundary_loads_list (2);
+		// The loaded faces:
+		 id_boundary_loads_list[enums::id_primary_load] = enums::id_boundary_yPlus;
+		 id_boundary_loads_list[enums::id_secondary_load] = enums::id_boundary_xPlus;
 
-	// The loaded faces:
-	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus;
-	 const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_xPlus;
+		return id_boundary_loads_list;
+	};	
 
-	// Characteristic body dimensions
-	 std::vector<double> body_dimensions (5);
-
-	// Some internal parameters
-	 struct parameterCollection
-	 {
-		const double search_tolerance = 1e-12;
-
+    std::vector< types::manifold_id > manifold_ids()
+	{
 		const types::manifold_id manifold_id_right_radius = 11;
 		const types::manifold_id manifold_id_left_radius = 10;
-	 };
+
+		return { manifold_id_left_radius, manifold_id_right_radius };
+	}
+
+    void make_grid ( /*input-> */ const Parameter::GeneralParameters &parameter,
+    				 /*output->*/ Triangulation<dim> &triangulation, 
+    				 	 	 	  std::vector<double> &body_dimensions,
+    							  std::vector< numEx::EvalPointClass<3> > &eval_points_list,
+								  const std::string relativePath
+    				);
+    
+    void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
+    						const bool &apply_dirichlet_bc, double &current_load_increment, const Parameter::GeneralParameters &parameter );
+
+	void make_grid_flat
+	( 
+		Triangulation<2> &tria_flat,
+		const double &length, const double &width, 
+		const std::vector< numEx::NotchClass<2> > &notch_list,
+		const unsigned int n_elements_in_x_for_coarse_mesh, const unsigned int n_refine_global, 
+		const unsigned int n_refine_local, std::vector<double> &body_dimensions, 
+		const unsigned int aux_var
+	);
+
+};
 
 	// All additional parameters
 	const bool trigger_localisation_by_notching = true;
@@ -95,10 +123,6 @@ namespace HyperRectangle
 //		const bool DENP_Hagen = false;
 //		const bool SheStrip = false;
 
-	// Notching
-	 const types::manifold_id manifold_id_notch_left = 10;
-	 const types::manifold_id manifold_id_notch_right = 11;
-	 
 	// Loading type and required modifications
 	// @note "compression": \n
 	// We use different boundary conditions and notch the body in the middle of its length and not a y=0.
@@ -107,98 +131,101 @@ namespace HyperRectangle
 	 //const enums::enum_loading_type loading_type = enums::Brick_Seupel_etal_a;
 	 //const enums::enum_loading_type loading_type = enums::compression;
 
-	// Evaluation points: \n
-	// We want points, one for the contraction of the center
-	// and one for the contraction of the top face.
-	// We don't know the coordinates yet, because the mesh has not yet been created.
-	// So we fill the data in make_grid.
-	// @todo We need \a dim here instead of 3, but dim is unkown at this place -> redesign
-	 std::vector< numEx::EvalPointClass<3> > eval_points_list (2, numEx::EvalPointClass<3>() );
-	 
 	/**
 	 * Apply the boundary conditions (support and load) on the given AffineConstraints \a constraints. \n
 	 * For the HyperRectangle that are three symmetry constraints on each plane (x=0, y=0, z=0) and the load on the \a id_boundary_load (for Dirichlet).
 	 */
-	template<int dim>
-	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
-							const bool &apply_dirichlet_bc, double &current_load_increment,
-							const Parameter::GeneralParameters &parameter )
+template<int dim>
+void numEx_HyperRectangle<dim>::make_constraints
+	( 
+		AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
+		const bool &apply_dirichlet_bc, double &current_load_increment,
+		const Parameter::GeneralParameters &parameter
+	)
+{
+	// BC on x0 plane
+	 if ( BC_xMinus==enums::BC_sym )	
+		numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+	 else if ( BC_xMinus==enums::BC_fix )
+		numEx::BC_apply_fix( enums::id_boundary_xMinus, dof_handler_ref, fe, constraints );
+		
+	// BC on y0 plane
+	 if ( BC_yMinus==enums::BC_fix )
+	 {
+		// For compression we fix/clamp the Y0 plane, so it does not run away
+		 numEx::BC_apply_fix( enums::id_boundary_yMinus, dof_handler_ref, fe, constraints );
+	 }
+	 else if ( BC_yMinus==enums::BC_sym)
+		numEx::BC_apply( enums::id_boundary_yMinus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		
+	if ( BC_yPlus==enums::BC_x0_z0 )
 	{
-		parameterCollection parameters_internal;
-
-		// BC on x0 plane
-		 if ( BC_xMinus==enums::BC_sym )	
-			numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-		 else if ( BC_xMinus==enums::BC_fix )
-			numEx::BC_apply_fix( enums::id_boundary_xMinus, dof_handler_ref, fe, constraints );
-		 
-		// BC on y0 plane
-		 if ( BC_yMinus==enums::BC_fix )
-		 {
-			// For compression we fix/clamp the Y0 plane, so it does not run away
-			 numEx::BC_apply_fix( enums::id_boundary_yMinus, dof_handler_ref, fe, constraints );
-		 }
-		 else if ( BC_yMinus==enums::BC_sym)
-			numEx::BC_apply( enums::id_boundary_yMinus, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-		 
-		 if ( BC_yPlus==enums::BC_x0_z0 )
-		 {
-			 numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-			 numEx::BC_apply( enums::id_boundary_yPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-		 }
-
-		// BC on z0 plane ...
-		 if ( dim==3 ) // ... only for 3D
-		 {
-			// For compression we don't fix anything in the third direction, because y0 was already clamped.
-			// @todo However, what about the upper part?
-			if ( BC_zMinus == enums::BC_sym )
-				numEx::BC_apply( enums::id_boundary_zMinus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-
-			if ( apply_sym_constraint_on_top_face )
-				numEx::BC_apply( enums::id_boundary_zPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-		 }
-		 
-		// BC for the yPlus
-		 if ( constrain_sideways_sliding_of_loaded_face && BC_yPlus==enums::BC_x0 )
-			numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
-
-		// BC for the load ...
-		 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver
-			numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		numEx::BC_apply( enums::id_boundary_yPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 	}
 
-
-	void make_grid_flat( Triangulation<2> &tria_flat,
-						 const double &length, const double &width, const std::vector< numEx::NotchClass<2> > &notch_list,
-						 const unsigned int n_elements_in_x_for_coarse_mesh, const unsigned int n_refine_global, const unsigned int n_refine_local, const unsigned int aux_var )
+	// BC on z0 plane ...
+	if ( dim==3 ) // ... only for 3D
 	{
-		parameterCollection parameters_internal;
-		const double search_tolerance = parameters_internal.search_tolerance;
+		// For compression we don't fix anything in the third direction, because y0 was already clamped.
+		// @todo However, what about the upper part?
+		if ( BC_zMinus == enums::BC_sym )
+			numEx::BC_apply( enums::id_boundary_zMinus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
-		// The ratio of the y and x lengths (typically greater than one)
-		 const double edge_length_ratio = length / width;
-		 
-		// Using \a ceil(*), because elements are typically elongated in this direction (at least under tension)
-		 unsigned int n_elements_in_y_for_homogeneous_mesh = n_elements_in_x_for_coarse_mesh * std::ceil( edge_length_ratio );
+		if ( apply_sym_constraint_on_top_face )
+			numEx::BC_apply( enums::id_boundary_zPlus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+	}
+		
+	// BC for the yPlus
+	 if ( constrain_sideways_sliding_of_loaded_face && BC_yPlus==enums::BC_x0 )
+		numEx::BC_apply( enums::id_boundary_yPlus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
-		 // hardcoded
-		 if ( refine_special == enums::Mesh_refine_none )
-			 n_elements_in_y_for_homogeneous_mesh = aux_var; //15;
+	// BC for the load ...
+	 if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver
+	 {
+		const std::vector< enums::enum_boundary_ids > id_boundary_loads_list = id_boundary_loads(); 
 
-		 const unsigned int n_elements_in_y_overhead = n_elements_in_x_for_coarse_mesh * std::ceil( std::ceil( edge_length_ratio ) - edge_length_ratio ) ;
+		numEx::BC_apply( id_boundary_loads_list[enums::id_primary_load], loading_direction(), current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+	 }
+}
 
-		// Refine at least a square part (widthxwidth) if desired. In case the plate is wider than long, we limit the length to the 0.9 *length,
-		// so we still leave a coarse part. If you want to limit the size of the refined fraction, just reduce the (1.*width).
-		// @todo-optimize The 0.1 coarse part is rather silly, maybe switch to uniform refinement instead for such a case.
-		 double length_refined = std::min( 1.*width, 0.9 * length );
+template<int dim>
+void numEx_HyperRectangle<dim>::make_grid_flat
+	( 
+		Triangulation<2> &tria_flat,
+		const double &length, const double &width, 
+		const std::vector< numEx::NotchClass<2> > &notch_list,
+		const unsigned int n_elements_in_x_for_coarse_mesh, const unsigned int n_refine_global, 
+		const unsigned int n_refine_local, std::vector<double> &body_dimensions, 
+		const unsigned int aux_var
+	)
+{
+	// @todo Remove hardcoding, load from numEx_baseClass
+	const double search_tolerance = 1e-12;
 
-		 if ( Neto_planeStrain )
-			 length_refined=length/6.;
-		 
-		// Created the base mesh from a brick, either as ...
-		 if ( refine_special==enums::Mesh_HyperRectangle_coarse_and_fine_brick /*use_fine_and_coarse_brick*/ ) // ... a fine and a coarse part or ...
-		 {
+	// The ratio of the y and x lengths (typically greater than one)
+	 const double edge_length_ratio = length / width;
+		
+	// Using \a ceil(*), because elements are typically elongated in this direction (at least under tension)
+	unsigned int n_elements_in_y_for_homogeneous_mesh = n_elements_in_x_for_coarse_mesh * std::ceil( edge_length_ratio );
+
+	// hardcoded
+	if ( refine_special == enums::Mesh_refine_none )
+		n_elements_in_y_for_homogeneous_mesh = aux_var; //15;
+
+	const unsigned int n_elements_in_y_overhead = n_elements_in_x_for_coarse_mesh * std::ceil( std::ceil( edge_length_ratio ) - edge_length_ratio ) ;
+
+	// Refine at least a square part (widthxwidth) if desired. In case the plate is wider than long, we limit the length to the 0.9 *length,
+	// so we still leave a coarse part. If you want to limit the size of the refined fraction, just reduce the (1.*width).
+	// @todo-optimize The 0.1 coarse part is rather silly, maybe switch to uniform refinement instead for such a case.
+	double length_refined = std::min( 1.*width, 0.9 * length );
+
+	if ( Neto_planeStrain )
+		length_refined=length/6.;
+		
+	// Created the base mesh from a brick, either as ...
+		if ( refine_special==enums::Mesh_HyperRectangle_coarse_and_fine_brick /*use_fine_and_coarse_brick*/ ) // ... a fine and a coarse part or ...
+		{
 			// The bricks are spanned by three points (p1,p2,p3). The bar is created from two bricks, 
 			// where the first will be meshed very fine (p1->p2) and the second remains coarse (p2->p3).
 			 Point<2> p1 (0,0);
@@ -357,6 +384,10 @@ namespace HyperRectangle
 
 				 numEx::notch_body( tria_flat, notch_list[0] );
 				 
+				const std::vector< types::manifold_id > manifold_ids_list = manifold_ids();
+				const types::manifold_id manifold_id_notch_left = manifold_ids_list[0];
+				const types::manifold_id manifold_id_notch_right = manifold_ids_list[1];
+
 				 if ( notch_type == enums::notch_round )
 				 {
 					 const Point<2> cyl_center_2D ( notch_list[0].cyl_center[0], notch_list[0].cyl_center[1] );
@@ -376,7 +407,7 @@ namespace HyperRectangle
 					  SphericalManifold<2> spherical_manifold ( cyl_center_2D );
 					  tria_flat.set_manifold( manifold_id_notch_left, spherical_manifold );
 				  }
-			 }
+			}
 //			 else
 //			 {
 //				 Point<3> face_normal(-1.,0,0);
@@ -388,40 +419,53 @@ namespace HyperRectangle
 //				 numEx::prepare_tria_for_notching( triangulation, notch );
 //				 numEx::notch_body( triangulation, notch );
 //			 }
-		 }
+		}
 
-		// Output the triangulation as eps or inp
-		 //numEx::output_triangulation( tria_flat, enums::output_eps, numEx_name );
-	}
+	// Output the triangulation as eps or inp
+	 //numEx::output_triangulation( tria_flat, enums::output_eps, numEx_name );
+}
 
 	
-	// 2D grid
-	template <int dim>
-	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
-	{
-		parameterCollection parameters_internal;
-		//const double search_tolerance = parameters_internal.search_tolerance;
+// 2D grid
+template <int dim>
+void numEx_HyperRectangle<dim>::make_grid
+	( 
+		/*input-> */ const Parameter::GeneralParameters &parameter,
+		/*output->*/ Triangulation<dim> &triangulation,
+					 std::vector<double> &body_dimensions,
+					 std::vector< numEx::EvalPointClass<3> > &eval_points_list,
+					 const std::string relativePath
+	) 
+{
+	AssertThrow(dim==2, ExcMessage(numEx_name()+" << not yet available for 3D"));
 
-		 refine_special = enums::enum_refine_special(parameter.refine_special);
 
-		// Assign the dimensions of the hyper rectangle and store them as characteristic lengths
-		 const double width = parameter.width;
-		 body_dimensions[enums::x] = width;
-		 const double length = parameter.height;
-		 body_dimensions[enums::y] = length;
-		 const unsigned int aux_var = int(parameter.holeRadius);
+	const double search_tolerance = numEx_class<dim>::search_tolerance;
 
-		 double notch_offset;
-		 if ( DENP_Laura )
-		 	 notch_offset = 10;
-		 else if ( DENP_Hagen )
-		  	  notch_offset = 20;
-		 else
-			 notch_offset = width;
+	refine_special = enums::enum_refine_special(parameter.refine_special);
+
+	// Assign the dimensions of the hyper rectangle and store them as characteristic lengths
+		const double width = parameter.width;
+		body_dimensions[enums::x] = width;
+		const double length = parameter.height;
+		body_dimensions[enums::y] = length;
+		const unsigned int aux_var = int(parameter.holeRadius);
+
+		double notch_offset;
+		if ( DENP_Laura )
+			notch_offset = 10;
+		else if ( DENP_Hagen )
+			notch_offset = 20;
+		else
+			notch_offset = width;
 
 		 // double notch for compression or bottom notch for tension
 		  const double notch_y_right = notch_twice ? (length/2.+notch_offset/2.) : 0;
 		 const double notch_y_left = length/2. - notch_offset/2.;
+
+		const std::vector< types::manifold_id > manifold_ids_list = manifold_ids();
+		const types::manifold_id manifold_id_notch_left = manifold_ids_list[0];
+		const types::manifold_id manifold_id_notch_right = manifold_ids_list[1];
 
 		// notching
 		 // First notch on the right
@@ -444,10 +488,10 @@ namespace HyperRectangle
 		// Create the 2D base mesh
 		 if ( notch_twice )
 			make_grid_flat( triangulation, length, width, {notch1,notch2},
-							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements, aux_var );
+							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements, body_dimensions, aux_var );
 		 else
 			make_grid_flat( triangulation, length, width, {notch1},
-							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements, aux_var );
+							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements, body_dimensions,  aux_var );
 
 		// Local refinements
 		 if ( notch_twice )
@@ -488,224 +532,9 @@ namespace HyperRectangle
 			 }
 		}
 
-		// Evaluation points and the related list of them
-		 numEx::EvalPointClass<3> eval_center ( Point<3>(width-notch_depth,0,0), enums::x );
-		 numEx::EvalPointClass<3> eval_top ( Point<3>(body_dimensions[enums::x],body_dimensions[enums::y],0), enums::x );
+	// Evaluation points and the related list of them
+	//numEx::EvalPointClass<3> eval_center ( Point<3>(width-notch_depth,0,0), enums::x );
+	const numEx::EvalPointClass<3> eval_top ( Point<3>(body_dimensions[enums::x],body_dimensions[enums::y],0), enums::y );
 
-		 eval_points_list = {eval_center,eval_top};
-	}
-	
-	// 3D grid
-	template <int dim>
-	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
-	{
-		parameterCollection parameters_internal;
-		const double search_tolerance = parameters_internal.search_tolerance;
-
-		 refine_special = enums::enum_refine_special(parameter.refine_special);
-
-		// Assign the dimensions of the hyper rectangle and store them as characteristic lengths
-		 const double width = parameter.width;
-		 body_dimensions[enums::x] = width;
-		 const double length = parameter.height;
-		 body_dimensions[enums::y] = length;
-		 const double thickness = parameter.thickness;
-		 body_dimensions[enums::z] = thickness;
-		 const unsigned int aux_var = int(parameter.holeRadius);
-
-
-		 const double notch_offset = DENP_Laura ? 10. : width;
-		 // double notch for compression or bottom notch for tension
-		  const double notch_y_right = notch_twice ? (length/2.+notch_offset/2.) : 0;
-		 const double notch_y_left = length/2.-notch_offset/2.;
-
-		// notching
-		 // First notch on the right
-		  const unsigned int n_elements_in_x_for_coarse_mesh = parameter.grid_y_repetitions;
-		  const double notch_reduction = parameter.ratio_x;
-		  Point<3> notch_reference_point1 ( width, notch_y_right, 0);
-		  Point<3> face_normal1(1.,0,0);
-		  double notch_depth = (1.-notch_reduction)*width;
-
-		  numEx::NotchClass<2> notch1 ( notch_type, parameter.notchWidth, notch_depth, notch_reference_point1, enums::id_boundary_xPlus,
-										face_normal1, enums::y, manifold_id_notch_right );
-
-		 // Second notch on the left
-		  Point<3> notch_reference_point2 ( 0, notch_y_left, 0);
-		  Point<3> face_normal2(-1.,0,0);
-
-		  numEx::NotchClass<2> notch2 ( notch_type, parameter.notchWidth, notch_depth, notch_reference_point2, enums::id_boundary_xMinus,
-										face_normal2, enums::y, manifold_id_notch_left );
-
-		  Triangulation<2> tria_flat;
-		// Create the 2D base mesh
-		 if ( notch_twice )
-			make_grid_flat( tria_flat, length, width, {notch1,notch2},
-							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements, aux_var );
-		 else
-			make_grid_flat( tria_flat, length, width, {notch1},
-							n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements, aux_var );
-
-
- 		GridGenerator::extrude_triangulation( tria_flat, parameter.nbr_elementsInZ, thickness, triangulation, true );
-
- 		// Redo the manifold for 3D
-		 Point<3> axis_dir (0,0,1);
- 		 CylindricalManifold<3> cylindrical_manifold1 (axis_dir, notch1.cyl_center);
- 		 triangulation.set_manifold( manifold_id_notch_right, cylindrical_manifold1 );
- 		 CylindricalManifold<3> cylindrical_manifold2 (axis_dir, notch2.cyl_center);
- 		 triangulation.set_manifold( manifold_id_notch_left, cylindrical_manifold2 );
-
- 		// Set boundary IDs
- 		for (typename Triangulation<3>::active_cell_iterator
- 			 cell = triangulation.begin_active();
- 			 cell != triangulation.end(); ++cell)
- 		{
- 			for (unsigned int face=0; face < GeometryInfo<2>::faces_per_cell; ++face)
- 			  if (cell->face(face)->at_boundary())
- 			  {
- 				if ( std::abs(cell->face(face)->center()[enums::z] - 0.0) < search_tolerance)
- 					cell->face(face)->set_boundary_id(enums::id_boundary_zMinus);
- 				else if ( std::abs(cell->face(face)->center()[enums::z] - body_dimensions[enums::z]) < search_tolerance)
- 					cell->face(face)->set_boundary_id(enums::id_boundary_zPlus);
- 			  }
- 		}
-		 
-		// Local refinements
-		 if ( notch_twice )
-		 {
-			 for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
-			 {
-				for (typename Triangulation<dim>::active_cell_iterator
-							 cell = triangulation.begin_active();
-							 cell != triangulation.end(); ++cell)
-				{
-						// Find all cells that lay in an exemplary damage band
-						 if ( std::abs( cell->center()[enums::y] - ( notch_offset/width * cell->center()[enums::x] + notch_y_left ) )
-						 	  < 1.75*parameter.notchWidth/2. )
-							cell->set_refine_flag();
-				} // end for(cell)
-				triangulation.execute_coarsening_and_refinement();
-			 }
-
-			 // special case:
-			 if ( DENP_Laura )
-				 triangulation.refine_global(parameter.nbr_global_refinements);
-		 }
-		 else if ( refine_special == enums::Mesh_refine_none )
-		 {
-			 // no refinement
-		 }
-		 else
-		 {
-			 double length_refined = std::min( 1.*width, 0.9 * length );
-
-			 for ( unsigned int nbr_local_ref=0; nbr_local_ref < 1/*parameter.nbr_holeEdge_refinements*/; nbr_local_ref++ )
-			 {
-				for (typename Triangulation<dim>::active_cell_iterator
-							 cell = triangulation.begin_active();
-							 cell != triangulation.end(); ++cell)
-				{
-						// Find all cells that lay in an exemplary damage band with size 1/4 from the y=0 face
-						if ( cell->center()[enums::y] < length_refined )
-							cell->set_refine_flag();
-				} // end for(cell)
-				triangulation.execute_coarsening_and_refinement();
-			 }
-		}
-
-		// Evaluation points and the related list of them
-		 numEx::EvalPointClass<3> eval_center ( Point<3>(width-notch_depth,0,0), enums::x );
-		 numEx::EvalPointClass<3> eval_top ( Point<3>(body_dimensions[enums::x],body_dimensions[enums::y],0), enums::x );
-
-		 eval_points_list = {eval_center,eval_top};
-	}
-//	// 3d grid
-//	template<int dim>
-//	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
-//	{
-//		parameterCollection parameters_internal;
-//		const double search_tolerance = parameters_internal.search_tolerance;
-//
-//		// Assign the dimensions of the hyper rectangle and store them as characteristic lengths
-//		 const double width = parameter.width;
-//		 body_dimensions[enums::x] = width;
-//		 const double length = parameter.height;
-//		 body_dimensions[enums::y] = length;
-//		 const double thickness = parameter.thickness;
-//		 body_dimensions[enums::z] = thickness;
-//
-//		const unsigned int n_elements_in_x_for_coarse_mesh = parameter.grid_y_repetitions;
-//		const double notch_reduction = parameter.ratio_x;
-//		 Point<3> notch_reference_point ( width, 0, 0);
-//		 Point<3> face_normal(1.,0,0);
-//		Point<3> axis_dir (0,0,1);
-//
-//		 double notch_depth = (1.-notch_reduction)*width;
-//
-//		 // notching
-//		numEx::NotchClass<2> notch ( notch_type, parameter.notchWidth, notch_depth, notch_reference_point, enums::id_boundary_xPlus,
-//									face_normal, enums::y, manifold_id_notch_left );
-//
-//		Triangulation<2> tria_flat;
-//		make_grid_flat( tria_flat, length, width, {notch},
-//						n_elements_in_x_for_coarse_mesh, parameter.nbr_global_refinements, parameter.nbr_holeEdge_refinements );
-//
-//		GridGenerator::extrude_triangulation( tria_flat, parameter.nbr_elementsInZ, parameter.thickness, triangulation, true );
-//
-//		// Redo the manifold for 3D
-//		 CylindricalManifold<3> cylindrical_manifold (axis_dir, notch.cyl_center);
-//		 triangulation.set_manifold( manifold_id_notch_left, cylindrical_manifold );
-//
-//		// Set boundary IDs
-//		for (typename Triangulation<3>::active_cell_iterator
-//			 cell = triangulation.begin_active();
-//			 cell != triangulation.end(); ++cell)
-//		{
-//			for (unsigned int face=0; face < GeometryInfo<2>::faces_per_cell; ++face)
-//			  if (cell->face(face)->at_boundary())
-//			  {
-//				if ( std::abs(cell->face(face)->center()[enums::z] - 0.0) < search_tolerance)
-//					cell->face(face)->set_boundary_id(enums::id_boundary_zMinus);
-//				else if ( std::abs(cell->face(face)->center()[enums::z] - body_dimensions[enums::z]) < search_tolerance)
-//					cell->face(face)->set_boundary_id(enums::id_boundary_zPlus);
-//			  }
-//		}
-//
-//		// In case we want local refinements to be isotropic (so refined in y and x and z).
-//		// We do this after the notching, so we can get away with slightly deeper notches.
-//		 if ( refine_local_isotropic )
-//		 {
-//			for ( unsigned int nbr_local_ref=0; nbr_local_ref < parameter.nbr_holeEdge_refinements; nbr_local_ref++ )
-//			{
-//				for (typename Triangulation<dim>::active_cell_iterator
-//							 cell = triangulation.begin_active();
-//							 cell != triangulation.end(); ++cell)
-//				{
-//					for (unsigned int vertex=0; vertex < GeometryInfo<dim>::vertices_per_cell; ++vertex)
-//					{
-//						// Find all cells that lay in an exemplary damage band with the given size from the y=0 face
-//						if ( cell->vertex(vertex)[enums::y] < std::min( 1.*width, 0.9 * length ) )
-//						{
-//							if ( nbr_local_ref>=1 )
-//								cell->set_refine_flag(RefinementCase<dim>::cut_y);
-//							else
-//								cell->set_refine_flag();
-//							break; // break the for(vertex)
-//						}
-//					} // end for(vertex)
-//				} // end for(cell)
-//				triangulation.execute_coarsening_and_refinement();
-//			}
-//		 } // end if(refine_local_isotropic)
-//
-//		// Evaluation points and the related list of them
-//		 numEx::EvalPointClass<dim> eval_center ( Point<3>(width-notch_depth,0,0), enums::x );
-//		 numEx::EvalPointClass<dim> eval_top ( Point<3>(body_dimensions[enums::x],body_dimensions[enums::y],0), enums::x );
-//
-//		 eval_points_list = {eval_center,eval_top};
-//
-//		// Output the triangulation as eps or inp
-//		 //numEx::output_triangulation( triangulation, enums::output_eps, numEx_name );
-//	}
+	eval_points_list[enums::eval_point_0] = eval_top;
 }
