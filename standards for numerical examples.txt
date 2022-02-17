@@ -5,3 +5,7 @@
 07.2020
 	Standard S07 (Year 202(0), month July (7)
     (First true and organised standard)
+
+16.02.2022
+	Standard S22 (Year 202(2), month February (2)
+    changed everything to classes derived from base class
