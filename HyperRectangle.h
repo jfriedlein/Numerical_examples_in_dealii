@@ -85,19 +85,33 @@ class numEx_HyperRectangle : public numEx_class<dim>
 	 const bool apply_sym_constraint_on_top_face = false; // to simulate plane strain for 3D, top face refers to zPlus
 	 
 	 // standard, tension:
-	  const enums::enum_BC BC_xMinus = enums::BC_sym;
-	  const enums::enum_BC BC_yPlus  = enums::BC_none;
-	  const bool constrain_sideways_sliding_of_loaded_face = false;
-	  const enums::enum_BC BC_yMinus = enums::BC_sym;
-	  const enums::enum_BC BC_zMinus = enums::BC_sym;
-	  const enums::enum_notch_type notch_type = enums::notch_linear;
-	  const bool notch_twice = false;
-	  const bool DENP_Laura = false;
-	  const bool DENP_Hagen = false;
-	  const bool SheStrip = true;
+	//   const enums::enum_BC BC_xMinus = enums::BC_sym;
+	//   const enums::enum_BC BC_yPlus  = enums::BC_none;
+	//   const bool constrain_sideways_sliding_of_loaded_face = false;
+	//   const enums::enum_BC BC_yMinus = enums::BC_sym;
+	//   const enums::enum_BC BC_zMinus = enums::BC_sym;
+	//   const enums::enum_notch_type notch_type = enums::notch_linear;
+	//   const bool notch_twice = false;
+	//   const bool DENP_Laura = false;
+	//   const bool DENP_Hagen = false;
+	//   const bool SheStrip = true;
 
 	  const bool Neto_planeStrain = false;
 	  const bool refine_globally = false;
+
+	 // DENP COMPLAS21
+	  const enums::enum_BC BC_xMinus = enums::BC_none;
+	  const enums::enum_BC BC_yPlus  = enums::BC_none;
+	  const bool constrain_sideways_sliding_of_loaded_face = false;
+	  const enums::enum_BC BC_yMinus = enums::BC_fix;
+	  const enums::enum_BC BC_zMinus = enums::BC_sym;
+	  const enums::enum_notch_type notch_type = enums::notch_round;
+	  const bool notch_twice = true;
+	  const bool DENP_Laura = false;
+	  const bool DENP_Hagen = false;
+	  const bool SheStrip = false;
+	  const bool DENP_planeStrain = true;
+
 
 	 // compression, Seupel et al:
 //	 const enums::enum_BC BC_xMinus = enums::BC_none;
@@ -438,9 +452,6 @@ void numEx_HyperRectangle<dim>::make_grid
 	) 
 {
 	AssertThrow(dim==2, ExcMessage(numEx_name()+" << not yet available for 3D"));
-
-
-	const double search_tolerance = numEx_class<dim>::search_tolerance;
 
 	refine_special = enums::enum_refine_special(parameter.refine_special);
 
