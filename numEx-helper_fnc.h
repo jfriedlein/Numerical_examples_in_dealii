@@ -9,6 +9,26 @@
 
 namespace enums
 {
+    enum enum_numExample
+	{
+		QuarterPlate = 1,
+		HyperCube = 2,
+		ThreePointBeam = 3,
+		HyperRectangle = 4,
+		Rod = 5,
+		tensileSpecimen = 6,
+		PlateWithAHole = 7,
+		Beam = 8,
+		Butterfly_shear = 9,
+		SphereRigid_Cube_contact = 10,
+		DoubleEdge = 11,
+		SingleEdgeNotchedPlate = 12,
+		HyperCube_shear = 13,
+		Miyauchi_shear = 14,
+		Unconstrained_elastoplastic_test = 15,
+		DENP_Laura_Abaqus_mesh = 16
+	};
+
     enum enum_boundary_ids
 	{
     	// @note Don't use id 0 for anything (it's the standard value or the reset value)
@@ -42,6 +62,17 @@ namespace enums
 		id_secondary_load = 1
 	};
     
+    enum enum_eval_point
+	{
+		eval_point_0 = 0,
+		eval_point_1 = 1,
+		eval_point_n = 1, // number of entries
+
+		eval_path0_start = 4,
+		eval_path0_end = 5,
+		eval_path_n = 5 // number of entries
+	};
+
     enum enum_loading_type
 	{
     	standard = 0,
