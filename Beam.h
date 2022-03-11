@@ -32,46 +32,72 @@ namespace enums
 }
 
 
-namespace Beam
-/*
- * A beam along x with one symmetry constraint in z, loaded in y-direction
- *
- * CERTIFIED TO STANDARD xxx
+/**
+ * @brief 
+ * CERTIFIED TO STANDARD S22
+ * 
+ * @tparam dim 
  */
+template<int dim>
+class numEx_Beam : public numEx_class<dim>
 {
+  public:
+      std::string numEx_name() {
+    	return "Beam";
+    };
+
 	// The loading direction: \n
 	// In which coordinate direction the load shall be applied, so x/y/z.
-	 const unsigned int loading_direction = enums::y;
+    unsigned int loading_direction() {
+		return enums::y; // enums::y, enums::x
+	};	
 
-	// The loaded faces:
-	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_xPlus; // load applied on the right face
-//	 const enums::enum_boundary_ids id_boundary_load = enums::id_boundary_yPlus; // load applied on top
-	 const enums::enum_boundary_ids id_boundary_secondaryLoad = enums::id_boundary_none;
+    std::vector< enums::enum_boundary_ids > id_boundary_loads()
+	{
+    	// The loaded faces:
+		std::vector< enums::enum_boundary_ids > id_boundary_loads_list (2);
+		id_boundary_loads_list[enums::id_primary_load] = enums::id_boundary_xPlus;
+		id_boundary_loads_list[enums::id_secondary_load] = enums::id_boundary_none;
 
-	// Characteristic body dimensions
-	 std::vector<double> body_dimensions (5);
+		return id_boundary_loads_list;
+	};	
 
-	// Some internal parameters
-	 struct parameterCollection
-	 {
-		const double search_tolerance = 1e-12;
-	 };
+	void make_grid ( /*input-> */ const Parameter::GeneralParameters &parameter,
+    				 /*output->*/ Triangulation<2> &triangulation, 
+    				 	 	 	  std::vector<double> &body_dimensions,
+    							  std::vector< numEx::EvalPointClass<3> > &eval_points_list,
+								  const std::string relativePath
+    				);
+	void make_grid ( /*input-> */ const Parameter::GeneralParameters &parameter,
+    				 /*output->*/ Triangulation<3> &triangulation, 
+    				 	 	 	  std::vector<double> &body_dimensions,
+    							  std::vector< numEx::EvalPointClass<3> > &eval_points_list,
+								  const std::string relativePath
+    				);
+    
+    void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
+    						const bool &apply_dirichlet_bc, double &current_load_increment, const Parameter::GeneralParameters &parameter );
 
-	// USER PARAMETER
-	 const unsigned int beam_type = enums::beam_clamped_free;
+};
+
 
 	template<int dim>
-	void make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
+	void numEx_Beam<dim>::make_constraints ( AffineConstraints<double> &constraints, const FESystem<dim> &fe, DoFHandler<dim> &dof_handler_ref,
 							const bool &apply_dirichlet_bc, double &current_load_increment,
 							const Parameter::GeneralParameters &parameter )
 	{
+		// USER PARAMETER
+		const unsigned int beam_type = enums::beam_clamped_free;
+
 		// clamping on X0 plane: set x, y and z displacements on x0 plane to zero
-		 //numEx::BC_apply_fix( enums::id_boundary_xMinus, dof_handler_ref, fe, constraints );
-		 numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		if ( beam_type == enums::beam_clamped_free )
+ 			numEx::BC_apply_fix( enums::id_boundary_xMinus, dof_handler_ref, fe, constraints );
+		else
+			numEx::BC_apply( enums::id_boundary_xMinus, enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 		// BC on z0 plane ...
-		 if ( dim==3 ) // ... only for 3D
-			numEx::BC_apply( enums::id_boundary_zMinus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+		//  if ( dim==3 ) // ... only for 3D
+		// 	numEx::BC_apply( enums::id_boundary_zMinus, enums::z, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 //		// Point-constraint
 //		 // First, add lines to the constraints matrix
@@ -88,11 +114,13 @@ namespace Beam
 		 }
 		 else if ( parameter.driver == enums::Dirichlet )  // ... as Dirichlet only for Dirichlet as driver, alternatively  ...
 		 {
-			numEx::BC_apply_fix( enums::id_boundary_xMinus, dof_handler_ref, fe, constraints );
-			numEx::BC_apply( id_boundary_load, enums::y, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+			 	 const std::vector< enums::enum_boundary_ids > id_boundary_loads_list = id_boundary_loads(); 
+
+			//numEx::BC_apply_fix( enums::id_boundary_xMinus, dof_handler_ref, fe, constraints );
+			numEx::BC_apply( id_boundary_loads_list[enums::id_primary_load], loading_direction(), current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 			if ( beam_type==enums::beam_clamped_sliding )
-				numEx::BC_apply( id_boundary_load, enums::y, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
+				numEx::BC_apply( id_boundary_loads_list[enums::id_primary_load], enums::x, 0, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
 
 			// classical
 //			 numEx::BC_apply( id_boundary_load, loading_direction, current_load_increment, apply_dirichlet_bc, dof_handler_ref, fe, constraints );
@@ -141,11 +169,13 @@ namespace Beam
 
 	// 2D grid
 	template <int dim>
-	void make_grid( Triangulation<2> &triangulation, const Parameter::GeneralParameters &parameter )
+	void numEx_Beam<dim>::make_grid( /*input-> */ const Parameter::GeneralParameters &parameter,
+									/*output->*/ Triangulation<2> &triangulation, 
+												std::vector<double> &body_dimensions,
+												std::vector< numEx::EvalPointClass<3> > &eval_points_list,
+												const std::string relativePath )
 	{
-		parameterCollection parameters_internal;
-
-		const double search_tolerance = parameters_internal.search_tolerance;
+		const double search_tolerance = numEx_class<dim>::search_tolerance;
 
 		// ToDo: use the values from the parameter file
 		const double width = parameter.width; // use thickness=width for square bottom area
@@ -209,7 +239,7 @@ namespace Beam
 							 cell != triangulation.end(); ++cell)
 				{
 					for ( unsigned int face=0; face < GeometryInfo<dim>::faces_per_cell; face++ )
-						if ( cell->center()[loading_direction] < length * refined_fraction )
+						if ( cell->center()[loading_direction()] < length * refined_fraction )
 						{
 							cell->set_refine_flag();
 							break;
@@ -414,11 +444,13 @@ namespace Beam
 
 // 3d grid
 	template <int dim>
-	void make_grid( Triangulation<3> &triangulation, const Parameter::GeneralParameters &parameter )
+	void numEx_Beam<dim>::make_grid( /*input-> */ const Parameter::GeneralParameters &parameter,
+									/*output->*/ Triangulation<3> &triangulation, 
+												std::vector<double> &body_dimensions,
+												std::vector< numEx::EvalPointClass<3> > &eval_points_list,
+												const std::string relativePath )
 	{
-		parameterCollection parameters_internal;
-
-		const double search_tolerance = parameters_internal.search_tolerance;
+		const double search_tolerance = numEx_class<dim>::search_tolerance;
 
 		// ToDo: use the values from the parameter file
 		const double width = parameter.width; // use thickness=width for square bottom area
@@ -438,6 +470,12 @@ namespace Beam
 		 Point<dim> p2 (length * refined_fraction, width, thickness); // extends in y-direction its height (loaded in y-direction as the othe models)
 		 Point<dim> p3 (length, 0, 0); // extends in y-direction its height (loaded in y-direction as the othe models)
 		 Point<dim> p4 (length, width, thickness);
+
+		// Create the evaluation point
+		{
+			const numEx::EvalPointClass<3> eval_point_0 ( p4, loading_direction() );
+			eval_points_list[enums::eval_point_0] = eval_point_0;
+		}
 
 		// Use fine and coarse brick
 		if ( parameter.refine_special==enums::Mesh_refine_special_standard )
@@ -484,7 +522,7 @@ namespace Beam
 							 cell != triangulation.end(); ++cell)
 				{
 					for ( unsigned int face=0; face < GeometryInfo<dim>::faces_per_cell; face++ )
-						if ( cell->center()[loading_direction] < length * refined_fraction )
+						if ( cell->center()[loading_direction()] < length * refined_fraction )
 						{
 							cell->set_refine_flag();
 							break;
@@ -617,4 +655,3 @@ namespace Beam
 //			std::cout<<"Mesh written to Grid-3d_quarter_plate_merged.inp "<<std::endl;
 //		}
 	}
-}
